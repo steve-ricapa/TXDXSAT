@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { HomePage } from "./HomePage";
 import { EmployeeHome } from "@/modules/employee/pages/EmployeeHome";
@@ -7,6 +7,7 @@ import { SuperAdminHome } from "@/modules/superadmin/pages/SuperAdminHome";
 import { LoginPage } from "@/modules/auth/pages/LoginPage";
 import { AccountPage } from "@/modules/auth/pages/AccountPage";
 import { ProtectedRoute } from "@/modules/auth/components/ProtectedRoute";
+import { useAuth } from "@/modules/auth/context/AuthContext";
 import { JoinPage } from "@/modules/live-sessions/pages/JoinPage";
 import { PlayPage } from "@/modules/live-sessions/pages/PlayPage";
 import { HostPage } from "@/modules/live-sessions/pages/HostPage";
@@ -23,13 +24,26 @@ export function resolveBasename(baseUrl: string): string {
   return trimmed === "" ? "/" : trimmed;
 }
 
+/** Keep the signed-in entry point stable while routing to the appropriate portal. */
+function DashboardEntry() {
+  const { user } = useAuth();
+  return <Navigate to={user?.role === "SUPERADMIN" ? "/superadmin" : "/admin"} replace />;
+}
+
 export const router = createBrowserRouter(
   [
+    { path: "/", element: <HomePage /> },
     {
-      path: "/",
+      path: "/dashboard",
+      element: (
+        <ProtectedRoute>
+          <DashboardEntry />
+        </ProtectedRoute>
+      ),
+    },
+    {
       element: <AppShell />,
       children: [
-        { index: true, element: <HomePage /> },
         { path: "employee", element: <EmployeeHome /> },
         {
           path: "admin",

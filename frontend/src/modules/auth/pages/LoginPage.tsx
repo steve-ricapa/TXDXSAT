@@ -24,7 +24,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const from = (location.state as LocationState | null)?.from ?? "/admin";
+  const from = (location.state as LocationState | null)?.from ?? "/dashboard";
 
   // Already authenticated: skip the form.
   if (status === "authenticated" && user) {

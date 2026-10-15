@@ -128,6 +128,36 @@ body {
   background-attachment: fixed;
 }
 
+/* Public landing: content sits directly on the background, without card stacks. */
+.landing-grid {
+  background-image:
+    linear-gradient(to right, rgba(38, 59, 85, 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(38, 59, 85, 0.22) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+@keyframes landing-enter {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-enter { animation: landing-enter 0.65s ease-out both; }
+  .landing-delay-1 { animation-delay: 100ms; }
+  .landing-delay-2 { animation-delay: 200ms; }
+  .landing-delay-3 { animation-delay: 300ms; }
+
+  .landing-animated .landing-reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.65s ease-out, transform 0.65s ease-out;
+  }
+  .landing-animated .landing-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Live-session identity: high-energy but on-brand (navy + turquoise). The
  * vibrant answer colours remain the only saturated accents.

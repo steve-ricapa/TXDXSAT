@@ -40,7 +40,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 function buildNavigation(role: UserRole | undefined): NavSection[] {
   const general: NavItem[] = [
-    { to: "/", label: "Inicio", icon: Home, end: true },
+    { to: "/", label: "Sitio público", icon: Home, end: true },
     { to: "/employee", label: "Mi capacitación", icon: GraduationCap },
   ];
 
@@ -89,7 +89,7 @@ export function AppShell() {
 
   async function onLogout() {
     await logout();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   }
 
   return (

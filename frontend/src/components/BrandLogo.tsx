@@ -26,7 +26,7 @@ export function BrandMark({
       height={size}
       alt={alt}
       className={cn("shrink-0 object-contain", className)}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: "auto" }}
       draggable={false}
     />
   );
