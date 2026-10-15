@@ -1,0 +1,45 @@
+# --- Dependencies -----------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+
+# --- Build output -----------------------------------------------------------
+dist/
+build/
+*.tsbuildinfo
+
+# --- Prisma -----------------------------------------------------------------
+# Generated client (recreated by `prisma generate`).
+backend/src/generated/
+# Local SQLite artefacts, if any ever appear.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# --- Environment / secrets --------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Logs -------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Testing / coverage -----------------------------------------------------
+coverage/
+.nyc_output/
+
+# --- Editors / OS -----------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# --- Misc -------------------------------------------------------------------
+.tmp/
+tmp/

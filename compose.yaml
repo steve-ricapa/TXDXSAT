@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------------------
+# TXDXSAT — production stack (three containers only)
+#
+#   docker compose up -d --build
+#
+# Networks:
+#   edge  — frontend <-> backend (published to the host)
+#   data  — backend  <-> db (internal: no host exposure, no egress)
+# ---------------------------------------------------------------------------
+name: txdxsat
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: txdxsat-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-txdxsat}
+      # Deterministic, reproducible collation for the database cluster.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      # Postgres 18 stores data under /var/lib/postgresql/18/docker; persisting
+      # the parent directory keeps upgrades working.
+      - txdxsat-db-data:/var/lib/postgresql
+    networks:
+      - data
+    # No ports: the database is reachable only from the internal network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    image: txdxsat-backend:latest
+    container_name: txdxsat-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4000"
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-txdxsat}?schema=public
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_PREFIX: /api/v1
+      SOCKET_PATH: /socket.io
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      DISPATCHER_ENABLED: "true"
+      DISPATCHER_INTERVAL_MS: "1000"
+      DISPATCHER_BATCH_SIZE: "25"
+      DISPATCHER_MAX_ATTEMPTS: "10"
+      DISPATCHER_LEASE_MS: "30000"
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+    # Not published to the host: reachable only through the frontend/Nginx.
+    expose:
+      - "4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runtime
+      args:
+        VITE_BASE_PATH: /sat/
+        VITE_APP_NAME: TXDXSAT
+    image: txdxsat-frontend:latest
+    container_name: txdxsat-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    networks:
+      - edge
+
+volumes:
+  txdxsat-db-data:
+    name: txdxsat-db-data
+
+networks:
+  edge:
+    name: txdxsat-edge
+    driver: bridge
+  data:
+    name: txdxsat-data
+    driver: bridge
+    # Private network: no external connectivity or host exposure.
+    internal: true

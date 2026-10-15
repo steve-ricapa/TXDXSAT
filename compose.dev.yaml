@@ -1,0 +1,98 @@
+# ---------------------------------------------------------------------------
+# TXDXSAT — development stack (hot reload for frontend and backend)
+#
+#   docker compose -f compose.dev.yaml up --build
+#
+# Differences from production:
+#   * Vite dev server (port 5173) with HMR instead of Nginx.
+#   * tsx watch for the backend, source trees bind-mounted.
+#   * Postgres published on the host (5433) for Prisma Studio / psql.
+# ---------------------------------------------------------------------------
+name: txdxsat-dev
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: txdxsat-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-txdx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-txdx}
+      POSTGRES_DB: ${POSTGRES_DB:-txdxsat}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - txdxsat-dev-db-data:/var/lib/postgresql
+    ports:
+      # Host access for migrations/psql; not part of the production topology.
+      - "${DB_PORT:-5433}:5432"
+    networks:
+      - dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    image: txdxsat-backend:dev
+    container_name: txdxsat-dev-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: "4000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-txdx}:${POSTGRES_PASSWORD:-txdx}@db:5432/${POSTGRES_DB:-txdxsat}?schema=public
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      DISPATCHER_ENABLED: "true"
+      DISPATCHER_INTERVAL_MS: "1000"
+      RUN_MIGRATIONS: "true"
+    volumes:
+      # Hot reload: source and Prisma schema are mounted over the image copy.
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - ./backend/prisma.config.ts:/app/prisma.config.ts
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - dev
+    command: >
+      sh -c "./node_modules/.bin/prisma migrate deploy &&
+             npm run dev"
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    image: txdxsat-frontend:dev
+    container_name: txdxsat-dev-frontend
+    restart: unless-stopped
+    environment:
+      VITE_BASE_PATH: /sat/
+      VITE_DEV_API_TARGET: http://backend:4000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+    networks:
+      - dev
+
+volumes:
+  txdxsat-dev-db-data:
+    name: txdxsat-dev-db-data
+
+networks:
+  dev:
+    name: txdxsat-dev
+    driver: bridge

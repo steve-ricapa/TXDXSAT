@@ -1,0 +1,12 @@
+node_modules
+dist
+src/generated
+prisma/migrations/dev.db*
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.git
+.gitignore
+coverage
+*.log

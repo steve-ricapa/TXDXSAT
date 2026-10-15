@@ -1,0 +1,225 @@
+// TXDXSAT — Prisma schema
+// -----------------------------------------------------------------------------
+// Fase 1 scope: durable event infrastructure (Transactional Outbox + idempotent
+// consumption log) only. Business tables are added by later migrations so that
+// existing tables are never dropped.
+//
+// Conventions
+//   * Primary keys: UUID v4 (`@default(uuid())`) exposed as `@db.Uuid`.
+//   * Timestamps:  `timestamptz(6)` (`@db.Timestamptz(6)`), UTC, snake_case columns.
+//   * Multi-tenancy: every business table carries a nullable/required `tenant_id`
+//     (`@db.Uuid`) so the platform can isolate companies logically. The tenant is
+//     enforced in the application/data-access layer (see docs/architecture.md).
+//   * Naming: Prisma models are PascalCase; tables/columns are snake_case via
+//     `@@map` / `@map` so raw SQL stays predictable.
+// -----------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Lifecycle of an outbox message.
+///   PENDING    -> waiting to be claimed by a dispatcher worker.
+///   PROCESSING -> claimed by a worker (lease held in `locked_at`).
+///   PROCESSED  -> all handlers completed successfully (terminal).
+///   FAILED     -> retries exhausted (terminal, kept for recovery/inspection).
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+/// Transactional Outbox. A domain event is appended to this table **inside the
+/// same PostgreSQL transaction** as the business change that produced it, which
+/// guarantees atomicity between state change and event publication.
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  /// Stable identity of the event itself; unique so the same event cannot be
+  /// enqueued twice, and used as the idempotency key by consumers.
+  eventId       String       @unique @map("event_id") @db.Uuid
+  eventType     String       @map("event_type") @db.VarChar(120)
+  version       Int          @default(1)
+  tenantId      String?      @map("tenant_id") @db.Uuid
+  payload       Json
+  correlationId String?      @map("correlation_id") @db.Uuid
+  causationId   String?      @map("causation_id") @db.Uuid
+  occurredAt    DateTime     @map("occurred_at") @db.Timestamptz(6)
+
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  maxAttempts   Int          @default(10) @map("max_attempts")
+  /// Earliest time the row may be claimed (implements backoff).
+  availableAt   DateTime     @default(now()) @map("available_at") @db.Timestamptz(6)
+  /// Lease timestamp; stale leases are recovered by the dispatcher.
+  lockedAt      DateTime?    @map("locked_at") @db.Timestamptz(6)
+  lockedBy      String?      @map("locked_by") @db.VarChar(120)
+  lastError     String?      @map("last_error")
+  dispatchedAt  DateTime?    @map("dispatched_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Claim scan: only PENDING rows whose backoff elapsed.
+  @@index([status, availableAt])
+  /// Recovery scan: reclaim PROCESSING rows with an expired lease.
+  @@index([status, lockedAt])
+  @@index([tenantId])
+  @@index([eventType])
+  @@map("outbox_events")
+}
+
+/// Consumption log used to make handlers idempotent. A handler records one row
+/// per (consumer, event) it has successfully processed; a replay simply finds the
+/// row and short-circuits. Delivery is therefore **at-least-once** and handlers
+/// must remain idempotent.
+model EventConsumption {
+  id          String   @id @default(uuid()) @db.Uuid
+  /// Logical consumer identity (usually the handler name).
+  consumer    String   @db.VarChar(120)
+  eventId     String   @map("event_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(120)
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(6)
+
+  /// Idempotency guarantee: one consumer can process a given event only once.
+  @@unique([consumer, eventId])
+  @@index([eventId])
+  @@index([tenantId])
+  @@index([processedAt])
+  @@map("event_consumptions")
+}
+
+// ---------------------------------------------------------------------------
+// Live sessions (Fase 2) — quiz engine
+// ---------------------------------------------------------------------------
+
+/// Supported question kinds. Mirrors the domain `QuestionType` union.
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  MULTI_SELECT
+  OPEN_TEXT
+  CLOSEST_TO
+}
+
+enum LiveSessionStatus {
+  WAITING
+  ACTIVE
+  FINISHED
+}
+
+model Quiz {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  title       String   @db.VarChar(200)
+  description String?
+  language    String   @default("es") @db.VarChar(10)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  questions Question[]
+  sessions  LiveSession[]
+
+  @@index([tenantId])
+  @@map("quizzes")
+}
+
+model Question {
+  id          String       @id @default(uuid()) @db.Uuid
+  quizId      String       @map("quiz_id") @db.Uuid
+  orderIndex  Int          @map("order_index")
+  type        QuestionType @default(MULTIPLE_CHOICE)
+  text        String
+  /// Answer options as a JSON array of strings.
+  options     Json         @default("[]")
+  correctIndex  Int?      @map("correct_index")
+  correctIndices Json?     @map("correct_indices")
+  correctText   String?    @map("correct_text")
+  rangeMin      Int?       @map("range_min")
+  rangeMax      Int?       @map("range_max")
+  correctNumber Int?       @map("correct_number")
+  explanation String?
+  imageUrl    String?      @map("image_url")
+  baseScore   Int          @default(500) @map("base_score")
+  timeSec     Int          @default(20) @map("time_sec")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, orderIndex])
+  @@index([quizId])
+  @@map("questions")
+}
+
+model LiveSession {
+  id                   String            @id @default(uuid()) @db.Uuid
+  tenantId             String?           @map("tenant_id") @db.Uuid
+  quizId               String            @map("quiz_id") @db.Uuid
+  /// Six-digit join code. Unique among non-finished sessions (enforced in app).
+  pin                  String            @db.VarChar(6)
+  status               LiveSessionStatus @default(WAITING)
+  currentQuestionIndex Int               @default(-1) @map("current_question_index")
+  /// Opaque credentials authorizing the host/presenter views.
+  hostToken            String            @map("host_token") @db.VarChar(80)
+  viewToken            String            @map("view_token") @db.VarChar(80)
+  participantCount     Int               @default(0) @map("participant_count")
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt            DateTime?         @map("started_at") @db.Timestamptz(6)
+  finishedAt           DateTime?         @map("finished_at") @db.Timestamptz(6)
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id])
+  players LivePlayer[]
+  answers LiveAnswer[]
+
+  @@index([pin])
+  @@index([tenantId])
+  @@index([status])
+  @@map("live_sessions")
+}
+
+model LivePlayer {
+  id         String   @id @default(uuid()) @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  tenantId   String?  @map("tenant_id") @db.Uuid
+  username   String   @db.VarChar(30)
+  avatar     String   @default("shield") @db.VarChar(40)
+  score      Int      @default(0)
+  joinedAt   DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+
+  session LiveSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers LiveAnswer[]
+
+  @@unique([sessionId, username])
+  @@index([sessionId])
+  @@index([tenantId])
+  @@map("live_players")
+}
+
+model LiveAnswer {
+  id            String   @id @default(uuid()) @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  playerId      String   @map("player_id") @db.Uuid
+  questionId    String   @map("question_id") @db.Uuid
+  chosenIndex   Int      @default(-1) @map("chosen_index")
+  chosenIndices Json?    @map("chosen_indices")
+  chosenText    String?  @map("chosen_text")
+  isCorrect     Boolean  @default(false) @map("is_correct")
+  score         Int      @default(0)
+  answerOrder   Int      @default(0) @map("answer_order")
+  answeredAt    DateTime @default(now()) @map("answered_at") @db.Timestamptz(6)
+
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  player  LivePlayer  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, questionId])
+  @@index([sessionId])
+  @@index([tenantId])
+  @@map("live_answers")
+}
