@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
+import { Activity, RefreshCw } from "lucide-react";
 import type { HealthReport } from "@/services/system";
 import { systemApi } from "@/services/system";
+import { Alert, Badge, Button, Card, Spinner } from "@/components/ui";
+import type { BadgeVariant } from "@/components/ui";
 
 type LoadState = "loading" | "ready" | "error";
+
+/** Map a health check value onto a badge tone without assuming an exact enum. */
+function toneFor(value: string): BadgeVariant {
+  const normalized = value.toLowerCase();
+  if (normalized.includes("ok") || normalized.includes("up") || normalized.includes("run")) return "success";
+  if (normalized.includes("degrad") || normalized.includes("warn")) return "warning";
+  if (normalized.includes("down") || normalized.includes("error") || normalized.includes("fail")) return "danger";
+  return "neutral";
+}
 
 /**
  * Verifies — from the browser — that the versioned API is reachable under the
@@ -45,28 +57,34 @@ export function SystemStatus() {
   }, [load]);
 
   return (
-    <section className="card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+    <Card className="p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-ink-muted">
+          <Activity className="h-4 w-4 text-accent" />
           Estado del sistema
         </h2>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => void onPublish()}
-          className="rounded-md bg-[var(--color-brand-600)] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[var(--color-brand-700)]"
+          leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
         >
           Publicar evento de prueba
-        </button>
+        </Button>
       </div>
 
-      {state === "loading" && <p className="text-sm text-[var(--color-ink-muted)]">Consultando…</p>}
+      {state === "loading" && (
+        <p className="flex items-center gap-2 text-sm text-ink-muted">
+          <Spinner className="h-4 w-4" /> Consultando…
+        </p>
+      )}
 
       {state === "error" && (
-        <p className="text-sm text-red-600">No se pudo contactar la API: {error}</p>
+        <Alert tone="danger">No se pudo contactar la API: {error}</Alert>
       )}
 
       {state === "ready" && health && (
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-4">
           <Stat label="Servicio" value={health.status} />
           <Stat label="Base de datos" value={health.checks.database} />
           <Stat label="Dispatcher" value={health.checks.dispatcher} />
@@ -83,19 +101,21 @@ export function SystemStatus() {
       )}
 
       {lastEventId && (
-        <p className="mt-3 text-xs text-emerald-600">
-          Evento publicado: <code>{lastEventId}</code>
+        <p className="mt-4 text-xs text-success">
+          Evento publicado: <code className="rounded bg-white/5 px-1.5 py-0.5">{lastEventId}</code>
         </p>
       )}
-    </section>
+    </Card>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dt className="text-xs uppercase tracking-wide text-ink-soft">{label}</dt>
+      <dd className="mt-1">
+        <Badge variant={toneFor(value)}>{value}</Badge>
+      </dd>
     </div>
   );
 }

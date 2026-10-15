@@ -135,31 +135,31 @@ export function HostPage() {
     return (
       <div className="live-screen flex min-h-screen items-center justify-center px-4 py-10">
         <LiveBackground />
-        <div className="slide-up relative z-10 w-full max-w-lg space-y-5 rounded-3xl bg-black/25 p-6 backdrop-blur sm:p-8">
+        <div className="game-panel slide-up relative z-10 w-full max-w-lg space-y-5 rounded-3xl p-6 sm:p-8">
           <header>
-            <h1 className="text-3xl font-black text-white">Nueva sesión en vivo</h1>
-            <p className="mt-1 text-sm text-white/60">
+            <h1 className="text-3xl font-black text-ink">Nueva sesión en vivo</h1>
+            <p className="mt-1 text-sm text-ink-muted">
               Elige un cuestionario para generar el PIN y el QR de acceso.
             </p>
           </header>
 
           {quizzes.length === 0 ? (
-            <div className="space-y-3 rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-white/80">Todavía no hay cuestionarios.</p>
+            <div className="game-inset space-y-3 rounded-2xl p-4">
+              <p className="text-sm text-ink-muted">Todavía no hay cuestionarios.</p>
               <Link
                 to="/live/editor"
-                className="inline-block rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/30"
+                className="inline-block rounded-xl bg-accent px-4 py-2 text-sm font-bold text-[#04211f] hover:brightness-110"
               >
                 Crear un cuestionario →
               </Link>
             </div>
           ) : (
             <label className="block">
-              <span className="text-sm font-medium text-white/80">Cuestionario</span>
+              <span className="text-sm font-medium text-ink">Cuestionario</span>
               <select
                 value={selectedQuiz}
                 onChange={(event) => setSelectedQuiz(event.target.value)}
-                className="mt-1 w-full rounded-xl bg-white/95 px-4 py-3 font-semibold text-slate-900"
+                className="mt-1 w-full rounded-xl border border-border bg-[var(--color-field)] px-4 py-3 font-semibold text-ink focus:border-accent focus:outline-none"
               >
                 {quizzes.map((quiz) => (
                   <option key={quiz.id} value={quiz.id}>
@@ -171,23 +171,23 @@ export function HostPage() {
           )}
 
           {setupError && (
-            <p className="rounded-xl bg-red-500/25 px-4 py-3 text-sm text-red-100">{setupError}</p>
+            <p className="rounded-xl bg-danger/15 px-4 py-3 text-sm text-danger-readable">{setupError}</p>
           )}
 
           <button
             type="button"
             disabled={!selectedQuiz || creating}
             onClick={createSession}
-            className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+            className="w-full rounded-2xl bg-accent py-4 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
           >
             {creating ? "Creando…" : "Crear sesión"}
           </button>
 
           <div className="flex items-center justify-between text-sm">
-            <Link to="/live/editor" className="text-white/70 underline hover:text-white">
+            <Link to="/live/editor" className="text-ink-muted underline hover:text-accent">
               Editor de cuestionarios
             </Link>
-            <Link to="/live/join" className="text-white/70 underline hover:text-white">
+            <Link to="/live/join" className="text-ink-muted underline hover:text-accent">
               Vista de jugador
             </Link>
           </div>
@@ -211,14 +211,14 @@ export function HostPage() {
       {/* Top bar */}
       <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 px-5 py-3">
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white/80">
+          <span className="game-chip rounded-full px-3 py-1 text-xs font-bold uppercase tracking-widest text-ink-muted">
             Anfitrión
           </span>
-          <h1 className="truncate font-bold text-white">{state?.quizTitle ?? record?.quizTitle ?? "Sesión"}</h1>
+          <h1 className="truncate font-bold text-ink">{state?.quizTitle ?? record?.quizTitle ?? "Sesión"}</h1>
         </div>
         <div className="flex items-center gap-2">
           {status === "WAITING" && (
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">
+            <span className="game-chip rounded-full px-3 py-1 text-xs font-bold text-ink">
               PIN {state?.pin ?? "—"}
             </span>
           )}
@@ -228,7 +228,7 @@ export function HostPage() {
               href={presentUrl}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/25"
+              className="game-chip rounded-full px-3 py-1.5 text-xs font-bold text-ink transition hover:border-accent/60"
             >
               🖥 Presentación
             </a>
@@ -237,7 +237,7 @@ export function HostPage() {
       </header>
 
       {error && (
-        <p className="mx-5 rounded-xl bg-red-500/25 px-4 py-2 text-sm text-red-100">{error}</p>
+        <p className="mx-5 rounded-xl bg-danger/15 px-4 py-2 text-sm text-danger-readable">{error}</p>
       )}
 
       <div className="relative z-0 grid min-h-0 flex-1 gap-4 px-5 pb-5 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -258,7 +258,7 @@ export function HostPage() {
 
           {status === "ACTIVE" && question && !ended && (
             <>
-              <div className="min-h-0 flex-1 rounded-3xl bg-black/20 p-5 backdrop-blur">
+              <div className="game-panel min-h-0 flex-1 rounded-3xl p-5">
                 <QuestionStage
                   question={question}
                   remaining={remaining}
@@ -273,7 +273,7 @@ export function HostPage() {
                   <button
                     type="button"
                     onClick={() => emit(ClientEvents.hostReveal)}
-                    className="rounded-2xl bg-amber-500 px-6 py-3 text-lg font-black uppercase tracking-wide text-white shadow-[0_5px_0_0_#a16207] transition hover:brightness-110 active:translate-y-1 active:shadow-none"
+                    className="rounded-2xl bg-warning px-6 py-3 text-lg font-black uppercase tracking-wide text-[#3a2500] shadow-[0_5px_0_0_#b45309] transition hover:brightness-110 active:translate-y-1 active:shadow-none"
                   >
                     Mostrar respuesta
                   </button>
@@ -282,14 +282,14 @@ export function HostPage() {
                   type="button"
                   onClick={() => emit(ClientEvents.hostNext)}
                   disabled={!revealed}
-                  className="rounded-2xl bg-violet-500 px-6 py-3 text-lg font-black uppercase tracking-wide text-white shadow-[0_5px_0_0_#5b21b6] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+                  className="rounded-2xl bg-accent px-6 py-3 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_5px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
                 >
                   {question.index + 1 >= question.total ? "Finalizar" : "Siguiente →"}
                 </button>
                 <button
                   type="button"
                   onClick={() => emit(ClientEvents.hostEnd)}
-                  className="ml-auto rounded-2xl bg-white/15 px-5 py-3 font-bold text-white hover:bg-white/25"
+                  className="game-chip ml-auto rounded-2xl px-5 py-3 font-bold text-ink transition hover:border-accent/60"
                 >
                   Terminar
                 </button>
@@ -298,27 +298,27 @@ export function HostPage() {
           )}
 
           {ended && (
-            <div className="relative min-h-0 flex-1 overflow-y-auto rounded-3xl bg-black/20 p-6 backdrop-blur">
-              <h2 className="mb-6 text-center text-2xl font-black text-white">🏆 Resultado final</h2>
+            <div className="game-panel relative min-h-0 flex-1 overflow-y-auto rounded-3xl p-6">
+              <h2 className="mb-6 text-center text-2xl font-black text-ink">🏆 Resultado final</h2>
               <Podium podium={ended.podium} leaderboard={ended.leaderboard} />
             </div>
           )}
         </main>
 
         <aside className="hidden min-h-0 flex-col gap-3 lg:flex">
-          <section className="flex min-h-0 flex-1 flex-col rounded-2xl bg-black/25 p-4 backdrop-blur">
-            <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-white/60">Clasificación</h2>
+          <section className="game-panel flex min-h-0 flex-1 flex-col rounded-2xl p-4">
+            <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-ink-muted">Clasificación</h2>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <Leaderboard entries={leaderboard} maxRows={12} />
             </div>
           </section>
-          <section className="rounded-2xl bg-black/25 p-4 backdrop-blur">
+          <section className="game-panel rounded-2xl p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-white/60">Jugadores</h2>
-              <span className="text-2xl font-black tabular-nums text-white">{state?.players.length ?? 0}</span>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-ink-muted">Jugadores</h2>
+              <span className="text-2xl font-black tabular-nums text-ink">{state?.players.length ?? 0}</span>
             </div>
             {status === "WAITING" && (
-              <p className="mt-2 text-xs text-white/50">Comparte el PIN o el QR para que se unan.</p>
+              <p className="mt-2 text-xs text-ink-soft">Comparte el PIN o el QR para que se unan.</p>
             )}
           </section>
         </aside>

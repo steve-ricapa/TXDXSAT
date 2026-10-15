@@ -3,7 +3,7 @@
  *
  * Presentational only: the server is authoritative and closes the question when
  * its own timer fires, so a drifted client can never extend play. The ring shifts
- * green → amber → red and pulses in the last seconds.
+ * accent → warning → danger and pulses in the last seconds.
  */
 export function TimerRing({
   remaining,
@@ -23,7 +23,7 @@ export function TimerRing({
   const urgent = remaining <= 5;
   const warning = remaining <= 10 && !urgent;
 
-  const strokeClass = urgent ? "text-red-400" : warning ? "text-amber-300" : "text-emerald-400";
+  const strokeClass = urgent ? "text-danger" : warning ? "text-warning" : "text-accent";
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -41,7 +41,7 @@ export function TimerRing({
             fill="none"
             stroke="currentColor"
             strokeWidth="8"
-            className="text-white/15"
+            className="text-ink/15"
           />
           <circle
             cx="50"
@@ -59,13 +59,13 @@ export function TimerRing({
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
             className={`font-black tabular-nums leading-none ${
-              urgent ? "text-red-300" : "text-white"
+              urgent ? "text-danger" : "text-ink"
             }`}
             style={{ fontSize: size * 0.36 }}
           >
             {remaining}
           </span>
-          {label && <span className="mt-1 text-[0.6rem] uppercase tracking-widest text-white/60">{label}</span>}
+          {label && <span className="mt-1 text-[0.6rem] uppercase tracking-widest text-ink-muted">{label}</span>}
         </div>
       </div>
     </div>

@@ -45,10 +45,10 @@ export function QuestionStage({
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-4 sm:gap-6">
       {/* Header — number + question */}
       <header className="text-center">
-        <span className="inline-block rounded-full bg-white/15 px-4 py-1 text-sm font-bold uppercase tracking-[0.25em] text-white/80">
+        <span className="game-chip inline-block rounded-full px-4 py-1 text-sm font-bold uppercase tracking-[0.25em] text-ink-muted">
           Pregunta {question.index + 1} / {question.total}
         </span>
-        <h1 className="mx-auto mt-3 max-w-6xl text-pretty text-2xl font-black leading-tight text-white drop-shadow sm:text-3xl xl:text-5xl">
+        <h1 className="mx-auto mt-3 max-w-6xl text-pretty text-2xl font-black leading-tight text-ink drop-shadow sm:text-3xl xl:text-5xl">
           {question.text}
         </h1>
       </header>
@@ -73,19 +73,19 @@ export function QuestionStage({
           )}
 
           {revealed ? (
-            <div className="pop-in rounded-2xl bg-white/15 px-6 py-3 text-center">
-              <p className="text-2xl font-black uppercase tracking-wide text-white sm:text-3xl">Resultados</p>
-              <p className="text-sm text-white/70">
+            <div className="game-chip pop-in rounded-2xl px-6 py-3 text-center">
+              <p className="text-2xl font-black uppercase tracking-wide text-ink sm:text-3xl">Resultados</p>
+              <p className="text-sm text-ink-muted">
                 {results?.answeredCount ?? answeredCount} respuestas
               </p>
             </div>
           ) : (
-            <div className="rounded-2xl bg-white/15 px-6 py-3 text-center">
-              <p className="text-3xl font-black tabular-nums text-white sm:text-4xl">
+            <div className="game-chip rounded-2xl px-6 py-3 text-center">
+              <p className="text-3xl font-black tabular-nums text-ink sm:text-4xl">
                 {answeredCount}
-                <span className="text-lg font-bold text-white/60 sm:text-2xl"> / {playerCount}</span>
+                <span className="text-lg font-bold text-ink-muted sm:text-2xl"> / {playerCount}</span>
               </p>
-              <p className="text-[0.65rem] uppercase tracking-widest text-white/60">
+              <p className="text-[0.65rem] uppercase tracking-widest text-ink-muted">
                 respuestas recibidas
               </p>
             </div>
@@ -98,15 +98,15 @@ export function QuestionStage({
         {isTextType ? (
           <div className="mx-auto flex max-w-3xl flex-col items-center gap-3">
             {!revealed ? (
-              <p className="rounded-2xl bg-white/10 px-6 py-4 text-center text-lg font-semibold text-white/80">
+              <p className="game-inset rounded-2xl px-6 py-4 text-center text-lg font-semibold text-ink-muted">
                 {question.type === "open_text"
                   ? "Los jugadores escriben su respuesta en el móvil…"
                   : "Los jugadores proponen un número en el móvil…"}
               </p>
             ) : (
-              <div className="pop-in rounded-2xl bg-emerald-500 px-8 py-6 text-center shadow-[0_6px_0_0_#166534]">
-                <p className="text-sm uppercase tracking-widest text-white/80">Respuesta correcta</p>
-                <p className="text-3xl font-black text-white">
+              <div className="pop-in rounded-2xl bg-accent px-8 py-6 text-center shadow-[0_6px_0_0_#00a79f]">
+                <p className="text-sm uppercase tracking-widest text-[#04211f]/70">Respuesta correcta</p>
+                <p className="text-3xl font-black text-[#04211f]">
                   {question.type === "open_text"
                     ? results?.correctText ?? "—"
                     : results?.correctNumber ?? "—"}
@@ -114,7 +114,7 @@ export function QuestionStage({
               </div>
             )}
             {revealed && results?.explanation && (
-              <p className="text-center text-sm text-white/70">{results.explanation}</p>
+              <p className="text-center text-sm text-ink-muted">{results.explanation}</p>
             )}
           </div>
         ) : (
@@ -145,12 +145,12 @@ export function QuestionStage({
             </div>
 
             {revealed && results?.explanation && (
-              <p className="pop-in mx-auto mt-3 max-w-4xl text-center text-sm text-white/75 sm:text-base">
+              <p className="pop-in mx-auto mt-3 max-w-4xl text-center text-sm text-ink-muted sm:text-base">
                 {results.explanation}
               </p>
             )}
             {!revealed && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-white/45">
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-ink-soft">
                 {slots.map((slot) => (
                   <SlotChip key={slot} slot={slot} />
                 ))}

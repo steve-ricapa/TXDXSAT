@@ -1,10 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 import { MediaPicker } from "../components/MediaPicker";
 import { MediaUploader } from "../components/MediaUploader";
 import { liveApi } from "../lib/api";
 import type { QuizDetail, QuizQuestionInput } from "../lib/api";
 import { listMedia, deleteMedia, type MediaAsset } from "../lib/media";
+import {
+  Alert,
+  Button,
+  buttonClass,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Field,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/ui";
 
 const DEFAULT_QUESTION: QuizQuestionInput = {
   type: "multiple_choice",
@@ -137,71 +151,72 @@ export function QuizEditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-8 text-white">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black">Editor de cuestionarios</h1>
-            <p className="text-sm text-white/60">Crea o edita preguntas con imágenes opcionales.</p>
-          </div>
-          <div className="flex gap-2">
-            <Link to="/live/host" className="rounded-xl bg-white/10 px-4 py-2 text-sm hover:bg-white/20">
-              Volver al anfitrión
-            </Link>
-            <button
-              onClick={handleSave}
-              disabled={saving || !title.trim() || questions.length === 0}
-              className="rounded-xl bg-emerald-500 px-6 py-2 font-bold shadow-[0_4px_0_0_#166534] enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+    <div className="mx-auto max-w-4xl space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink">Editor de cuestionarios</h1>
+          <p className="text-sm text-ink-muted">Crea o edita preguntas con imágenes opcionales.</p>
+        </div>
+        <div className="flex gap-2">
+          <Link to="/live/host" className={buttonClass({ variant: "outline" })}>
+            <ArrowLeft className="h-4 w-4" />
+            Volver al anfitrión
+          </Link>
+          <Button
+            variant="accent"
+            onClick={handleSave}
+            loading={saving}
+            disabled={saving || !title.trim() || questions.length === 0}
+            leftIcon={<Save className="h-4 w-4" />}
+          >
+            Guardar
+          </Button>
+        </div>
+      </header>
+
+      {error && <Alert tone="danger">{error}</Alert>}
+      {loading && <p className="text-sm text-ink-muted">Cargando…</p>}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Datos del cuestionario</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Field label="Título" htmlFor="quiz-title" required>
+            <Input id="quiz-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label="Descripción" htmlFor="quiz-description">
+            <Textarea id="quiz-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </Field>
+        </CardContent>
+      </Card>
+
+      {questions.map((q, qi) => (
+        <Card key={qi}>
+          <CardHeader className="items-center">
+            <CardTitle>Pregunta {qi + 1}</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => removeQuestion(qi)}
+              className="text-danger-readable hover:bg-danger/10 hover:text-danger-readable"
+              leftIcon={<Trash2 className="h-4 w-4" />}
             >
-              {saving ? "Guardando…" : "Guardar"}
-            </button>
-          </div>
-        </header>
-
-        {error && <p className="rounded-xl bg-red-500/25 px-4 py-3 text-sm text-red-100">{error}</p>}
-        {loading && <p className="text-white/60">Cargando…</p>}
-
-        <section className="space-y-4 rounded-2xl bg-slate-900/80 p-6">
-          <label className="block">
-            <span className="text-sm font-medium text-white/80">Título</span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-white/95 px-4 py-2 text-slate-900"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-white/80">Descripción</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-white/95 px-4 py-2 text-slate-900"
-              rows={2}
-            />
-          </label>
-        </section>
-
-        {questions.map((q, qi) => (
-          <section key={qi} className="space-y-4 rounded-2xl bg-slate-900/80 p-6">
-            <header className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">Pregunta {qi + 1}</h2>
-              <button onClick={() => removeQuestion(qi)} className="text-sm text-rose-300 hover:text-rose-200">
-                Eliminar
-              </button>
-            </header>
-
-            <label className="block">
-              <span className="text-sm font-medium text-white/80">Enunciado</span>
-              <textarea
+              Eliminar
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field label="Enunciado" htmlFor={`q-${qi}-text`}>
+              <Textarea
+                id={`q-${qi}-text`}
                 value={q.text}
                 onChange={(e) => updateQuestion(qi, { text: e.target.value })}
-                className="mt-1 w-full rounded-xl bg-white/95 px-4 py-2 text-slate-900"
                 rows={3}
               />
-            </label>
+            </Field>
 
             <div>
-              <span className="text-sm font-medium text-white/80">Imagen principal (opcional)</span>
+              <span className="text-sm font-medium text-ink">Imagen principal (opcional)</span>
               <div className="mt-2">
                 <MediaUploader
                   value={q.imageUrl}
@@ -213,23 +228,20 @@ export function QuizEditorPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               {q.options.map((opt, oi) => (
-                <div key={oi} className="space-y-2 rounded-xl bg-white/5 p-4">
+                <div key={oi} className="game-inset space-y-2 rounded-xl p-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold">Opción {oi + 1}</span>
-                    <label className="flex items-center gap-1 text-xs">
+                    <span className="text-sm font-bold text-ink">Opción {oi + 1}</span>
+                    <label className="flex items-center gap-1 text-xs text-ink-muted">
                       <input
                         type="radio"
                         checked={q.correctIndex === oi}
                         onChange={() => updateQuestion(qi, { correctIndex: oi, correctIndices: null })}
+                        className="accent-accent"
                       />
                       Correcta
                     </label>
                   </div>
-                  <input
-                    value={opt}
-                    onChange={(e) => updateOption(qi, oi, e.target.value)}
-                    className="w-full rounded-lg bg-white/95 px-3 py-2 text-slate-900"
-                  />
+                  <Input value={opt} onChange={(e) => updateOption(qi, oi, e.target.value)} />
                   <MediaUploader
                     value={(q.optionImages ?? [])[oi] ?? null}
                     onChange={(url) => updateOptionImage(qi, oi, url ?? null)}
@@ -240,59 +252,50 @@ export function QuizEditorPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <label>
-                <span className="text-xs text-white/60">Tipo</span>
-                <select
-                  value={q.type}
-                  onChange={(e) => updateQuestion(qi, { type: e.target.value as any })}
-                  className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-slate-900"
-                >
+              <Field label="Tipo">
+                <Select value={q.type} onChange={(e) => updateQuestion(qi, { type: e.target.value as any })}>
                   <option value="multiple_choice">multiple_choice</option>
                   <option value="true_false">true_false</option>
                   <option value="multi_select">multi_select</option>
                   <option value="open_text">open_text</option>
                   <option value="closest_to">closest_to</option>
-                </select>
-              </label>
-              <label>
-                <span className="text-xs text-white/60">Tiempo (s)</span>
-                <input
+                </Select>
+              </Field>
+              <Field label="Tiempo (s)">
+                <Input
                   type="number"
                   value={q.timeSec}
                   onChange={(e) => updateQuestion(qi, { timeSec: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-slate-900"
                 />
-              </label>
-              <label>
-                <span className="text-xs text-white/60">Puntos base</span>
-                <input
+              </Field>
+              <Field label="Puntos base">
+                <Input
                   type="number"
                   value={q.baseScore}
                   onChange={(e) => updateQuestion(qi, { baseScore: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-slate-900"
                 />
-              </label>
+              </Field>
             </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-white/80">Explicación</span>
-              <textarea
+            <Field label="Explicación" htmlFor={`q-${qi}-explanation`}>
+              <Textarea
+                id={`q-${qi}-explanation`}
                 value={q.explanation ?? ""}
                 onChange={(e) => updateQuestion(qi, { explanation: e.target.value || null })}
-                className="mt-1 w-full rounded-xl bg-white/95 px-4 py-2 text-slate-900"
                 rows={2}
               />
-            </label>
-          </section>
-        ))}
+            </Field>
+          </CardContent>
+        </Card>
+      ))}
 
-        <button
-          onClick={addQuestion}
-          className="w-full rounded-2xl border-2 border-dashed border-white/30 py-4 text-sm font-bold hover:bg-white/5"
-        >
-          + Añadir pregunta
-        </button>
-      </div>
+      <button
+        onClick={addQuestion}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-4 text-sm font-bold text-ink-muted transition-colors hover:border-accent hover:bg-accent/5 hover:text-ink"
+      >
+        <Plus className="h-4 w-4" />
+        Añadir pregunta
+      </button>
 
       <MediaPicker
         open={pickerOpen}

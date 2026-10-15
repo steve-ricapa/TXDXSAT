@@ -46,7 +46,7 @@ export function MediaUploader({ value, onChange, tenantId, onUploaded, maxMb = 5
         handleFiles(e.dataTransfer.files);
       }}
       className={`rounded-xl border-2 border-dashed p-4 transition ${
-        drag ? "border-white/60 bg-white/10" : "border-white/30 bg-white/5"
+        drag ? "border-accent bg-accent/10" : "border-border bg-[var(--color-field)]"
       }`}
     >
       <input
@@ -63,7 +63,7 @@ export function MediaUploader({ value, onChange, tenantId, onUploaded, maxMb = 5
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="rounded-lg bg-white/20 px-3 py-1.5 text-sm font-bold text-white hover:bg-white/30"
+              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-bold text-[#04211f] hover:brightness-110"
               disabled={uploading}
             >
               Reemplazar
@@ -71,7 +71,7 @@ export function MediaUploader({ value, onChange, tenantId, onUploaded, maxMb = 5
             <button
               type="button"
               onClick={() => onChange(null)}
-              className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-white/70 hover:bg-white/20"
+              className="rounded-lg border border-border px-3 py-1.5 text-sm text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"
             >
               Eliminar
             </button>
@@ -79,19 +79,19 @@ export function MediaUploader({ value, onChange, tenantId, onUploaded, maxMb = 5
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
-          <p className="font-semibold text-white">Arrastra una imagen aquí o haz clic para subirla</p>
-          <p className="text-xs text-white/60">JPG, PNG, WebP · Máx. {maxMb} MB</p>
+          <p className="font-semibold text-ink">Arrastra una imagen aquí o haz clic para subirla</p>
+          <p className="text-xs text-ink-muted">JPG, PNG, WebP · Máx. {maxMb} MB</p>
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="mt-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/30"
+            className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-[#04211f] hover:brightness-110"
             disabled={uploading}
           >
             {uploading ? "Subiendo…" : "Seleccionar imagen"}
           </button>
         </div>
       )}
-      {error && <p className="mt-2 text-center text-sm text-red-200">{error}</p>}
+      {error && <p className="mt-2 text-center text-sm text-danger-readable">{error}</p>}
     </div>
   );
 }

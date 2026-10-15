@@ -29,26 +29,26 @@ export function MediaPicker({ open, tenantId, onClose, onSelect, onDelete }: Med
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
-      <div className="flex w-full max-w-4xl flex-col gap-4 rounded-2xl bg-slate-900 p-6 text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
+      <div className="flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-border bg-[var(--color-surface)] p-6 text-ink">
         <header className="flex items-center justify-between">
           <h2 className="text-lg font-bold">Seleccionar imagen</h2>
-          <button onClick={onClose} className="text-sm text-white/70 hover:text-white">
+          <button onClick={onClose} className="text-sm text-ink-muted transition-colors hover:text-ink">
             Cerrar
           </button>
         </header>
 
-        {loading && <p className="text-sm text-white/60">Cargando…</p>}
-        {error && <p className="rounded-lg bg-red-500/25 px-3 py-2 text-sm text-red-100">{error}</p>}
+        {loading && <p className="text-sm text-ink-muted">Cargando…</p>}
+        {error && <p className="rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger-readable">{error}</p>}
 
         <div className="grid grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
           {assets.length === 0 && !loading && (
-            <p className="col-span-full text-sm text-white/50">Aún no has subido imágenes.</p>
+            <p className="col-span-full text-sm text-ink-soft">Aún no has subido imágenes.</p>
           )}
           {assets.map((asset) => {
             const url = resolveMediaUrl(`/api/v1/media/${asset.id}`);
             return (
-              <div key={asset.id} className="flex flex-col rounded-xl bg-white/5">
+              <div key={asset.id} className="game-inset flex flex-col rounded-xl">
                 <button
                   type="button"
                   onClick={() => {
@@ -59,7 +59,7 @@ export function MediaPicker({ open, tenantId, onClose, onSelect, onDelete }: Med
                 >
                   <img src={url ?? ''} alt="" className="h-32 w-full rounded-t-xl object-cover" />
                 </button>
-                <div className="flex items-center justify-between px-2 py-2 text-xs text-white/60">
+                <div className="flex items-center justify-between px-2 py-2 text-xs text-ink-muted">
                   <span className="truncate">{asset.id.slice(0, 8)}…</span>
                   {onDelete && (
                     <button
@@ -68,7 +68,7 @@ export function MediaPicker({ open, tenantId, onClose, onSelect, onDelete }: Med
                         e.stopPropagation();
                         onDelete(asset);
                       }}
-                      className="text-rose-300 hover:text-rose-200"
+                      className="text-danger-readable hover:brightness-110"
                     >
                       Eliminar
                     </button>

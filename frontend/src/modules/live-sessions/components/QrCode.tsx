@@ -4,6 +4,8 @@ import QRCode from "qrcode";
 /**
  * QR code for the join URL. Generated locally (no external service) so the
  * stack keeps working fully offline / air-gapped.
+ *
+ * Kept on a white tile: the quiet zone is required for reliable scanning.
  */
 export function QrCode({ value, size = 200 }: { value: string; size?: number }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
   if (!dataUrl) {
     return (
       <div
-        className="flex items-center justify-center rounded-xl bg-white text-xs text-slate-400"
+        className="flex items-center justify-center rounded-xl bg-white text-xs text-ink-soft"
         style={{ width: size, height: size }}
       >
         QR

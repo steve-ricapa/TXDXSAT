@@ -118,7 +118,7 @@ export function PresentPage() {
   if (!viewToken) {
     return (
       <div className="live-screen flex h-screen items-center justify-center px-4">
-        <p className="rounded-2xl bg-black/30 px-6 py-4 text-white/80 backdrop-blur">
+        <p className="game-panel rounded-2xl px-6 py-4 text-ink-muted">
           Falta el token de presentación. Ábrelo desde la pantalla del anfitrión.
         </p>
       </div>
@@ -141,7 +141,7 @@ export function PresentPage() {
       </div>
 
       {error && (
-        <p className="relative z-10 mx-auto mt-3 rounded-xl bg-red-500/25 px-4 py-2 text-sm text-red-100">
+        <p className="relative z-10 mx-auto mt-3 rounded-xl bg-danger/15 px-4 py-2 text-sm text-danger-readable">
           {error}
         </p>
       )}
@@ -149,7 +149,7 @@ export function PresentPage() {
       <div className="relative z-0 mx-auto flex w-full max-w-[1800px] flex-1 flex-col px-6 py-6">
         {!state && (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-lg text-white/70">Conectando a la sesión…</p>
+            <p className="text-lg text-ink-muted">Conectando a la sesión…</p>
           </div>
         )}
 
@@ -167,8 +167,8 @@ export function PresentPage() {
         )}
 
         {countdown !== null && countdown > 0 && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <span key={countdown} className="drop-in text-[12rem] font-black leading-none text-white">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+            <span key={countdown} className="drop-in text-[12rem] font-black leading-none text-ink">
               {countdown}
             </span>
           </div>
@@ -188,13 +188,13 @@ export function PresentPage() {
 
         {state?.status === "ACTIVE" && !question && !ended && countdown === null && (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-2xl font-bold text-white/80">¡Preparados!</p>
+            <p className="text-2xl font-bold text-ink-muted">¡Preparados!</p>
           </div>
         )}
 
         {ended && (
           <div className="flex min-h-0 flex-1 flex-col justify-center py-4">
-            <h1 className="mb-6 text-center text-4xl font-black text-white">🏆 Resultado final</h1>
+            <h1 className="mb-6 text-center text-4xl font-black text-ink">🏆 Resultado final</h1>
             <Podium podium={ended.podium} leaderboard={ended.leaderboard} playSound={false} />
           </div>
         )}

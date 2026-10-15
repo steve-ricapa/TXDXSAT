@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 
-const COLORS = ["#e21b3c", "#1368ce", "#d89e00", "#26890c", "#8b5cf6", "#f472b6", "#38bdf8"];
+/**
+ * Confetti palette: the four answer colours (the gamified exception) plus the
+ * corporate accent/info hues.
+ */
+const COLORS = ["#E21B3C", "#1368CE", "#D89E00", "#26890C", "#00C7BE", "#38BDF8", "#123F73"];
 
 /**
  * Lightweight CSS confetti — deterministic pieces, no canvas and no animation

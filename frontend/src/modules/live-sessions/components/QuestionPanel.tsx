@@ -51,12 +51,12 @@ export function QuestionPanel({
   if (answered) {
     return (
       <div className="pop-in flex h-full flex-col items-center justify-center gap-5 text-center">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/20 text-5xl pulse-ring">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent-soft text-5xl pulse-ring">
           ✅
         </div>
         <div>
-          <p className="text-2xl font-black text-white">¡Respuesta enviada!</p>
-          <p className="mt-1 text-sm text-white/60">Espera a que el anfitrión muestre los resultados.</p>
+          <p className="text-2xl font-black text-ink">¡Respuesta enviada!</p>
+          <p className="mt-1 text-sm text-ink-muted">Espera a que el anfitrión muestre los resultados.</p>
         </div>
 
         {(submitted?.slot !== undefined || submitted?.text) && (
@@ -64,14 +64,14 @@ export function QuestionPanel({
             {submitted?.slot !== undefined && submitted.slot >= 0 ? (
               <AnswerCard slot={submitted.slot} text={optionText(question, submitted.slot)} variant="player" state="idle" />
             ) : (
-              <p className="rounded-2xl bg-white/15 px-4 py-4 font-semibold text-white">
+              <p className="game-chip rounded-2xl px-4 py-4 font-semibold text-ink">
                 “{submitted?.text}”
               </p>
             )}
           </div>
         )}
 
-        <p className="text-xs uppercase tracking-widest text-white/40">🔒 Respuesta bloqueada</p>
+        <p className="text-xs uppercase tracking-widest text-ink-soft">🔒 Respuesta bloqueada</p>
       </div>
     );
   }
@@ -85,13 +85,13 @@ export function QuestionPanel({
           placeholder="Escribe tu respuesta…"
           autoFocus
           maxLength={300}
-          className="w-full rounded-2xl border-4 border-white/20 bg-white/10 px-5 py-5 text-xl font-bold text-white placeholder:text-white/40 focus:border-white/60 focus:outline-none"
+          className="w-full rounded-2xl border-2 border-border bg-[var(--color-field)] px-5 py-5 text-xl font-bold text-ink placeholder:text-ink-soft focus:border-accent focus:outline-none"
         />
         <button
           type="button"
           disabled={!text.trim()}
           onClick={() => onSubmit({ chosenText: text.trim() })}
-          className="rounded-2xl bg-emerald-500 px-6 py-5 text-xl font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+          className="rounded-2xl bg-accent px-6 py-5 text-xl font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
         >
           Enviar
         </button>
@@ -108,13 +108,13 @@ export function QuestionPanel({
           placeholder="Escribe un número…"
           inputMode="numeric"
           autoFocus
-          className="w-full rounded-2xl border-4 border-white/20 bg-white/10 px-5 py-6 text-center text-4xl font-black text-white placeholder:text-2xl placeholder:text-white/40 focus:border-white/60 focus:outline-none"
+          className="w-full rounded-2xl border-2 border-border bg-[var(--color-field)] px-5 py-6 text-center text-4xl font-black text-ink placeholder:text-2xl placeholder:text-ink-soft focus:border-accent focus:outline-none"
         />
         <button
           type="button"
           disabled={text.trim() === ""}
           onClick={() => onSubmit({ chosenText: text.trim() })}
-          className="rounded-2xl bg-emerald-500 px-6 py-5 text-xl font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+          className="rounded-2xl bg-accent px-6 py-5 text-xl font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
         >
           Enviar
         </button>
@@ -159,14 +159,14 @@ export function QuestionPanel({
           type="button"
           disabled={selected.length === 0}
           onClick={() => onSubmit({ chosenIndices: selected })}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-4 text-lg font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-6 py-4 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
         >
           Enviar {selected.length > 0 && `(${selected.length})`}
         </button>
       )}
 
       {isMulti && selected.length > 0 && (
-        <p className="flex items-center justify-center gap-2 text-center text-xs text-white/60">
+        <p className="flex items-center justify-center gap-2 text-center text-xs text-ink-muted">
           {selected.map((slot) => (
             <AnswerShape key={slot} shape={paletteFor(slot).shape} className="h-3 w-3" />
           ))}

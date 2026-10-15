@@ -30,71 +30,71 @@ export function Lobby({
   return (
     <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch">
       {/* Join panel */}
-      <div className="slide-up flex flex-1 flex-col items-center justify-center gap-4 rounded-3xl bg-black/25 p-6 backdrop-blur sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/60">Únete con el PIN</p>
-        <p className="text-6xl font-black tracking-[0.15em] text-white drop-shadow-lg sm:text-7xl">{pin}</p>
+      <div className="game-panel slide-up flex flex-1 flex-col items-center justify-center gap-4 rounded-3xl p-6 sm:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-ink-muted">Únete con el PIN</p>
+        <p className="text-6xl font-black tracking-[0.15em] text-ink drop-shadow-lg sm:text-7xl">{pin}</p>
 
         <div className="rounded-2xl bg-white p-3 shadow-2xl">
           <QrCode value={joinUrl} size={180} />
         </div>
-        <p className="max-w-xs break-all text-center text-xs text-white/60">{joinUrl}</p>
+        <p className="max-w-xs break-all text-center text-xs text-ink-muted">{joinUrl}</p>
 
         {role === "host" && onStart && (
           <button
             type="button"
             onClick={onStart}
             disabled={!canStart}
-            className={`mt-2 w-full max-w-sm rounded-2xl px-8 py-5 text-2xl font-black uppercase tracking-wide text-white transition ${
+            className={`mt-2 w-full max-w-sm rounded-2xl px-8 py-5 text-2xl font-black uppercase tracking-wide transition ${
               canStart
-                ? "bg-emerald-500 shadow-[0_8px_0_0_#166534] hover:brightness-110 active:translate-y-1 active:shadow-none"
-                : "cursor-not-allowed bg-white/15 text-white/50"
+                ? "bg-accent text-[#04211f] shadow-[0_8px_0_0_#00a79f] hover:brightness-110 active:translate-y-1 active:shadow-none"
+                : "game-chip cursor-not-allowed text-ink-soft"
             }`}
           >
             {canStart ? "Empezar" : "Esperando jugadores…"}
           </button>
         )}
         {role === "host" && !canStart && (
-          <p className="text-xs text-white/50">Necesitas al menos un jugador para empezar.</p>
+          <p className="text-xs text-ink-soft">Necesitas al menos un jugador para empezar.</p>
         )}
       </div>
 
       {/* Players panel */}
-      <div className="slide-up flex flex-1 flex-col gap-4 rounded-3xl bg-black/25 p-6 backdrop-blur sm:p-8">
+      <div className="game-panel slide-up flex flex-1 flex-col gap-4 rounded-3xl p-6 sm:p-8">
         <div className="flex items-baseline justify-between gap-4">
           <div>
-            <h2 className="text-xl font-black text-white sm:text-2xl">{quizTitle}</h2>
-            <p className="text-sm text-white/60">{questionCount} preguntas</p>
+            <h2 className="text-xl font-black text-ink sm:text-2xl">{quizTitle}</h2>
+            <p className="text-sm text-ink-muted">{questionCount} preguntas</p>
           </div>
-          <div className="rounded-2xl bg-white/15 px-4 py-2 text-center">
-            <p className="text-3xl font-black tabular-nums text-white">{players.length}</p>
-            <p className="text-[0.65rem] uppercase tracking-widest text-white/60">jugadores</p>
+          <div className="game-chip rounded-2xl px-4 py-2 text-center">
+            <p className="text-3xl font-black tabular-nums text-ink">{players.length}</p>
+            <p className="text-[0.65rem] uppercase tracking-widest text-ink-muted">jugadores</p>
           </div>
         </div>
 
         {players.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
             <span className="text-4xl">📱</span>
-            <p className="font-semibold text-white/80">Esperando jugadores…</p>
-            <p className="text-sm text-white/50">Escanea el código o introduce el PIN en tu móvil.</p>
+            <p className="font-semibold text-ink-muted">Esperando jugadores…</p>
+            <p className="text-sm text-ink-soft">Escanea el código o introduce el PIN en tu móvil.</p>
           </div>
         ) : (
           <ul className="grid flex-1 auto-rows-min grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
             {players.map((player, index) => (
               <li
                 key={player.playerId}
-                className="stagger flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2"
+                className="game-chip stagger flex items-center gap-2 rounded-xl px-3 py-2"
                 style={{ ["--i" as string]: index % 12 }}
               >
                 <Avatar avatar={player.avatar} size="sm" />
-                <span className="truncate text-sm font-semibold text-white">{player.username}</span>
-                {!player.connected && <span className="text-[0.6rem] text-white/40">off</span>}
+                <span className="truncate text-sm font-semibold text-ink">{player.username}</span>
+                {!player.connected && <span className="text-[0.6rem] text-ink-soft">off</span>}
               </li>
             ))}
           </ul>
         )}
 
         {role === "player" && (
-          <p className="rounded-xl bg-white/10 px-4 py-3 text-center text-sm font-semibold text-white/80">
+          <p className="game-inset rounded-xl px-4 py-3 text-center text-sm font-semibold text-ink-muted">
             ¡Estás dentro! Mira la pantalla del anfitrión.
           </p>
         )}

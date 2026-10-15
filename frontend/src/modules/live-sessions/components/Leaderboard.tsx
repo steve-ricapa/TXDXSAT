@@ -9,10 +9,11 @@ export interface LeaderboardRow {
   score: number;
 }
 
+/** On-palette rank badges: accent (1), info (2), primary (3). */
 const RANK_STYLES = [
-  "bg-amber-400 text-amber-950", // 1
-  "bg-slate-300 text-slate-800", // 2
-  "bg-orange-400 text-orange-950", // 3
+  "bg-accent text-[#04211f]", // 1
+  "bg-info text-[#04211f]", // 2
+  "bg-primary text-white", // 3
 ];
 
 /**
@@ -78,7 +79,7 @@ export function Leaderboard({
   }, [shown]);
 
   if (entries.length === 0) {
-    return <p className="text-sm text-white/50">Aún no hay jugadores.</p>;
+    return <p className="text-sm text-ink-muted">Aún no hay jugadores.</p>;
   }
 
   return (
@@ -94,29 +95,29 @@ export function Leaderboard({
               else refs.current.delete(entry.playerId);
             }}
             className={`flex items-center gap-3 rounded-xl px-3 py-2 ${
-              isSelf ? "bg-white/25 ring-2 ring-white/60" : "bg-white/10"
+              isSelf ? "bg-accent/20 ring-2 ring-accent/60" : "game-chip"
             }`}
           >
             <span
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-black tabular-nums ${
-                RANK_STYLES[entry.rank - 1] ?? "bg-white/15 text-white"
+                RANK_STYLES[entry.rank - 1] ?? "game-chip text-ink"
               }`}
             >
               {entry.rank}
             </span>
             <Avatar avatar={entry.avatar} size="sm" />
-            <span className="flex-1 truncate font-semibold text-white">{entry.username}</span>
+            <span className="flex-1 truncate font-semibold text-ink">{entry.username}</span>
             {delta !== 0 && (
               <span
                 className={`text-xs font-bold tabular-nums ${
-                  delta > 0 ? "text-emerald-300" : "text-rose-300"
+                  delta > 0 ? "text-success" : "text-danger-readable"
                 }`}
                 title={delta > 0 ? "Sube posiciones" : "Baja posiciones"}
               >
                 {delta > 0 ? `▲${delta}` : `▼${Math.abs(delta)}`}
               </span>
             )}
-            <span className="w-16 text-right font-black tabular-nums text-white">{entry.score}</span>
+            <span className="w-16 text-right font-black tabular-nums text-ink">{entry.score}</span>
           </li>
         );
       })}

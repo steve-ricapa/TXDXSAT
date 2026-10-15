@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Lock, Mail, ShieldCheck } from "lucide-react";
 import { ApiError } from "@/services/api-client";
+import { BrandMark } from "@/components/BrandLogo";
+import { Alert, Button, Card, Field, Input } from "@/components/ui";
 import { useAuth } from "../context/AuthContext";
 
 interface LocationState {
@@ -43,62 +46,69 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--color-brand-700)] to-[var(--color-brand-900)] px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
-        <header className="mb-6 text-center">
-          <h1 className="text-2xl font-black tracking-tight">
-            TXDX<span className="text-[var(--color-brand-600)]">SAT</span>
+    <div className="app-canvas flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <BrandMark size={96} className="drop-shadow-xl" />
+          <h1 className="mt-4 text-2xl font-black tracking-tight text-ink">
+            TXDX<span className="text-accent">SAT</span>
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Acceso al panel de administración
-          </p>
-        </header>
+          <p className="mt-1 text-sm text-ink-muted">Acceso al panel de administración</p>
+        </div>
 
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <label className="block">
-            <span className="text-sm font-medium text-[var(--color-ink)]">Correo</span>
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-[var(--color-brand-500)] focus:ring-2 focus:ring-[var(--color-brand-500)]/30"
-              placeholder="admin@empresa.com"
-            />
-          </label>
+        <Card className="p-7">
+          <form onSubmit={onSubmit} className="space-y-4" noValidate>
+            <Field label="Correo" htmlFor="login-email" required>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="username"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="pl-10"
+                  placeholder="admin@empresa.com"
+                />
+              </div>
+            </Field>
 
-          <label className="block">
-            <span className="text-sm font-medium text-[var(--color-ink)]">Contraseña</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-[var(--color-brand-500)] focus:ring-2 focus:ring-[var(--color-brand-500)]/30"
-              placeholder="••••••••"
-            />
-          </label>
+            <Field label="Contraseña" htmlFor="login-password" required>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="pl-10"
+                  placeholder="••••••••"
+                />
+              </div>
+            </Field>
 
-          {error && (
-            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-              {error}
-            </p>
-          )}
+            {error && <Alert tone="danger">{error}</Alert>}
 
-          <button
-            type="submit"
-            disabled={submitting || email.length === 0 || password.length === 0}
-            className="w-full rounded-xl bg-[var(--color-brand-600)] py-3 text-sm font-bold text-white transition hover:bg-[var(--color-brand-700)] disabled:opacity-50"
-          >
-            {submitting ? "Entrando…" : "Iniciar sesión"}
-          </button>
-        </form>
+            <Button
+              type="submit"
+              variant="accent"
+              size="lg"
+              className="w-full"
+              loading={submitting}
+              disabled={email.length === 0 || password.length === 0}
+            >
+              Iniciar sesión
+            </Button>
+          </form>
+        </Card>
 
-        <p className="mt-6 text-center text-xs text-[var(--color-ink-muted)]">
+        <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-ink-muted">
+          <ShieldCheck className="h-3.5 w-3.5 text-accent" />
           Las cuentas son creadas por un superadministrador.{" "}
-          <Link to="/" className="underline hover:text-[var(--color-brand-600)]">
+          <Link to="/" className="font-medium text-accent hover:underline">
             Volver al inicio
           </Link>
         </p>

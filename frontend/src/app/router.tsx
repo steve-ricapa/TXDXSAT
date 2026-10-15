@@ -55,6 +55,14 @@ export const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        {
+          path: "live/editor",
+          element: (
+            <ProtectedRoute>
+              <QuizEditorPage />
+            </ProtectedRoute>
+          ),
+        },
         { path: "*", element: <NotFoundPage /> },
       ],
     },
@@ -74,14 +82,6 @@ export const router = createBrowserRouter(
     },
     { path: "live/host/:sessionId", element: <HostPage /> },
     { path: "live/present/:sessionId", element: <PresentPage /> },
-    {
-      path: "live/editor",
-      element: (
-        <ProtectedRoute>
-          <QuizEditorPage />
-        </ProtectedRoute>
-      ),
-    },
   ],
   { basename: resolveBasename(import.meta.env.BASE_URL) },
 );

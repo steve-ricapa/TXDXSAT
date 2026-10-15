@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from "react";
+import { LogOut, ShieldCheck, UserCircle2 } from "lucide-react";
 import { ApiError } from "@/services/api-client";
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Field, Input } from "@/components/ui";
 import { authApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+
+const ROLE_LABEL = { SUPERADMIN: "Superadmin", ADMIN: "Administrador" } as const;
 
 /** Self-service account screen: profile, password change and sign out. */
 export function AccountPage() {
@@ -34,67 +38,93 @@ export function AccountPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight">Mi cuenta</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          {user.name} · {user.email} · {user.role === "SUPERADMIN" ? "Superadmin" : "Administrador"}
-        </p>
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">Mi cuenta</h1>
+        <p className="mt-1 text-sm text-ink-muted">Gestiona tu perfil y tu contraseña.</p>
       </header>
 
-      <section className="card p-5">
-        <h2 className="font-semibold">Cambiar contraseña</h2>
-        <form onSubmit={onChangePassword} className="mt-4 space-y-4">
-          <label className="block">
-            <span className="text-sm font-medium">Contraseña actual</span>
-            <input
-              type="password"
-              required
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Nueva contraseña (mín. 10)</span>
-            <input
-              type="password"
-              required
-              minLength={10}
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-            />
-          </label>
+      <Card>
+        <CardContent className="flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold uppercase text-white">
+            {user.name.slice(0, 1)}
+          </span>
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 font-semibold text-ink">
+              {user.name}
+              <Badge variant={user.role === "SUPERADMIN" ? "accent" : "neutral"}>
+                {ROLE_LABEL[user.role]}
+              </Badge>
+            </p>
+            <p className="truncate text-sm text-ink-muted">{user.email}</p>
+          </div>
+        </CardContent>
+      </Card>
 
-          {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-          {message && (
-            <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</p>
-          )}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-accent" />
+            <CardTitle>Cambiar contraseña</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onChangePassword} className="space-y-4">
+            <Field label="Contraseña actual" htmlFor="current-password" required>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+              />
+            </Field>
+            <Field
+              label="Nueva contraseña"
+              htmlFor="new-password"
+              hint="Mínimo 10 caracteres."
+              required
+            >
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={10}
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+            </Field>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-xl bg-[var(--color-brand-600)] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--color-brand-700)] disabled:opacity-50"
+            {error && <Alert tone="danger">{error}</Alert>}
+            {message && <Alert tone="success">{message}</Alert>}
+
+            <Button type="submit" variant="accent" loading={submitting}>
+              Actualizar contraseña
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <UserCircle2 className="mt-0.5 h-5 w-5 text-ink-soft" />
+            <div>
+              <h2 className="font-semibold text-ink">Sesión</h2>
+              <p className="text-sm text-ink-muted">Cierra la sesión en este dispositivo.</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => void logout()}
+            leftIcon={<LogOut className="h-4 w-4" />}
           >
-            {submitting ? "Guardando…" : "Actualizar contraseña"}
-          </button>
-        </form>
-      </section>
-
-      <section className="card flex items-center justify-between p-5">
-        <div>
-          <h2 className="font-semibold">Sesión</h2>
-          <p className="text-sm text-[var(--color-ink-muted)]">Cierra la sesión en este dispositivo.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void logout()}
-          className="rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold hover:bg-black/5"
-        >
-          Cerrar sesión
-        </button>
-      </section>
+            Cerrar sesión
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

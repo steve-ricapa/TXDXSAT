@@ -7,6 +7,9 @@ import { sound } from "../lib/sound";
 const MEDALS = ["🥇", "🥈", "🥉"];
 const PEDESTAL = ["h-44 sm:h-56", "h-32 sm:h-40", "h-24 sm:h-28"];
 const PLACE_LABEL = ["1.º", "2.º", "3.º"];
+/** Flat on-palette pedestal fills: accent (1), info (2), primary (3). */
+const PEDESTAL_FILL = ["bg-accent", "bg-info", "bg-primary"];
+const PEDESTAL_TEXT = ["text-[#04211f]/70", "text-[#04211f]/70", "text-white/75"];
 
 /**
  * Final standings: a rising three-step podium (winner centre) plus the rest of
@@ -55,24 +58,18 @@ export function Podium({
                 <Avatar avatar={entry.avatar} size={isWinner ? "lg" : "md"} ring />
               </div>
               <div className="text-center">
-                <p className={`truncate font-black text-white ${isWinner ? "text-lg sm:text-2xl" : "text-sm sm:text-base"}`}>
+                <p className={`truncate font-black text-ink ${isWinner ? "text-lg sm:text-2xl" : "text-sm sm:text-base"}`}>
                   {entry.username}
                 </p>
-                <p className="text-sm font-bold tabular-nums text-amber-200 sm:text-lg">{entry.score} pts</p>
-                <p className="text-[0.65rem] text-white/60 sm:text-xs">
+                <p className="text-sm font-bold tabular-nums text-warning sm:text-lg">{entry.score} pts</p>
+                <p className="text-[0.65rem] text-ink-muted sm:text-xs">
                   {entry.correctAnswers}/{entry.totalAnswers} correctas
                 </p>
               </div>
               <div
-                className={`w-full rounded-t-xl ${PEDESTAL[placeIndex]} ${
-                  isWinner
-                    ? "bg-gradient-to-b from-amber-300 to-amber-500"
-                    : placeIndex === 1
-                      ? "bg-gradient-to-b from-slate-200 to-slate-400"
-                      : "bg-gradient-to-b from-orange-300 to-orange-500"
-                }`}
+                className={`w-full rounded-t-xl ${PEDESTAL[placeIndex]} ${PEDESTAL_FILL[placeIndex]}`}
               >
-                <span className="flex h-full items-start justify-center pt-2 text-2xl font-black text-black/50">
+                <span className={`flex h-full items-start justify-center pt-2 text-2xl font-black ${PEDESTAL_TEXT[placeIndex]}`}>
                   {PLACE_LABEL[placeIndex]}
                 </span>
               </div>
@@ -84,11 +81,11 @@ export function Podium({
       {rest.length > 0 && (
         <ol className="mx-auto max-w-md space-y-1">
           {rest.slice(0, 10).map((entry) => (
-            <li key={entry.playerId} className="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-1.5">
-              <span className="w-6 text-center text-sm tabular-nums text-white/60">{entry.rank}</span>
+            <li key={entry.playerId} className="game-chip flex items-center gap-3 rounded-lg px-3 py-1.5">
+              <span className="w-6 text-center text-sm tabular-nums text-ink-muted">{entry.rank}</span>
               <Avatar avatar={entry.avatar} size="sm" />
-              <span className="flex-1 truncate text-sm text-white">{entry.username}</span>
-              <span className="text-sm font-semibold tabular-nums text-white">{entry.score}</span>
+              <span className="flex-1 truncate text-sm text-ink">{entry.username}</span>
+              <span className="text-sm font-semibold tabular-nums text-ink">{entry.score}</span>
             </li>
           ))}
         </ol>

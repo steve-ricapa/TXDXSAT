@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import { sound } from "../lib/sound";
 
 /**
@@ -22,18 +23,18 @@ export function SoundControls({ compact = false }: { compact?: boolean }) {
           sound.setMuted(next);
           setMuted(next);
         }}
-        className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/25"
+        className="game-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink transition hover:border-accent/60"
         aria-label={muted ? "Activar sonido" : "Silenciar"}
         title={muted ? "Activar sonido" : "Silenciar"}
       >
-        {muted ? "🔇" : "🔊"}
+        {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
       </button>
 
       {!compact && (
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/25"
+          className="game-chip rounded-full px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:border-accent/60 hover:text-ink"
         >
           Volumen
         </button>
@@ -50,7 +51,7 @@ export function SoundControls({ compact = false }: { compact?: boolean }) {
             sound.setVolume(value);
             setVolume(value);
           }}
-          className="h-1.5 w-28 cursor-pointer appearance-none rounded-full bg-white/30 accent-white"
+          className="h-1.5 w-28 cursor-pointer appearance-none rounded-full bg-border accent-accent"
           aria-label="Volumen"
         />
       )}

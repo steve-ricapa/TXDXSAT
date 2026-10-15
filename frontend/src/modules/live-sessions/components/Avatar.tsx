@@ -14,7 +14,7 @@ export function Avatar({
   return (
     <span
       className={`inline-flex items-center justify-center rounded-full ${dimensions} ${
-        ring ? "ring-4 ring-white/40" : ""
+        ring ? "ring-4 ring-accent/40" : ""
       }`}
       style={{ backgroundColor: `${def.color}22`, border: `2px solid ${def.color}` }}
       aria-hidden

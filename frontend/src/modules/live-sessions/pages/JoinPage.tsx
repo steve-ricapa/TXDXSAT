@@ -84,44 +84,44 @@ export function JoinPage() {
     <div className="live-screen flex min-h-screen flex-col">
       <LiveBackground />
       <header className="relative z-10 flex items-center justify-between px-5 py-3">
-        <Link to="/" className="text-sm font-bold text-white hover:underline">
+        <Link to="/" className="text-sm font-bold text-ink hover:text-accent hover:underline">
           TXDXSAT
         </Link>
         <SoundControls compact />
       </header>
 
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-6">
-        <form onSubmit={submit} className="slide-up w-full max-w-md space-y-5 rounded-3xl bg-black/25 p-6 backdrop-blur sm:p-8">
+        <form onSubmit={submit} className="game-panel slide-up w-full max-w-md space-y-5 rounded-3xl p-6 sm:p-8">
           <header className="text-center">
-            <h1 className="text-3xl font-black text-white">Unirse a la sesión</h1>
-            <p className="mt-1 text-sm text-white/60">Introduce el PIN y tu nombre para empezar.</p>
+            <h1 className="text-3xl font-black text-ink">Unirse a la sesión</h1>
+            <p className="mt-1 text-sm text-ink-muted">Introduce el PIN y tu nombre para empezar.</p>
           </header>
 
           <label className="block">
-            <span className="text-sm font-medium text-white/80">PIN</span>
+            <span className="text-sm font-medium text-ink">PIN</span>
             <input
               value={pin}
               onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
               inputMode="numeric"
               autoComplete="off"
               placeholder="000000"
-              className="mt-1 w-full rounded-2xl bg-white/95 px-4 py-3 text-center text-3xl font-black tracking-[0.5em] text-slate-900 focus:outline-none"
+              className="mt-1 w-full rounded-2xl border border-border bg-[var(--color-field)] px-4 py-3 text-center text-3xl font-black tracking-[0.5em] text-ink placeholder:text-ink-soft focus:border-accent focus:outline-none"
             />
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-white/80">Tu nombre</span>
+            <span className="text-sm font-medium text-ink">Tu nombre</span>
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value.slice(0, 24))}
               maxLength={24}
               placeholder="Ej. Ana"
-              className="mt-1 w-full rounded-2xl bg-white/95 px-4 py-3 text-lg font-semibold text-slate-900 focus:outline-none"
+              className="mt-1 w-full rounded-2xl border border-border bg-[var(--color-field)] px-4 py-3 text-lg font-semibold text-ink placeholder:text-ink-soft focus:border-accent focus:outline-none"
             />
           </label>
 
           <div>
-            <span className="text-sm font-medium text-white/80">Tu avatar</span>
+            <span className="text-sm font-medium text-ink">Tu avatar</span>
             <div className="mt-2 grid grid-cols-6 gap-2">
               {AVATARS.map((option) => (
                 <button
@@ -129,7 +129,7 @@ export function JoinPage() {
                   type="button"
                   onClick={() => setAvatar(option.id)}
                   className={`flex aspect-square items-center justify-center rounded-xl text-2xl transition ${
-                    avatar === option.id ? "ring-4 ring-white" : "opacity-70 hover:opacity-100"
+                    avatar === option.id ? "ring-4 ring-accent" : "opacity-70 hover:opacity-100"
                   }`}
                   style={{ backgroundColor: `${option.color}33` }}
                   aria-label={option.id}
@@ -140,18 +140,18 @@ export function JoinPage() {
             </div>
           </div>
 
-          {error && <p className="rounded-xl bg-red-500/25 px-4 py-3 text-sm text-red-100">{error}</p>}
+          {error && <p className="rounded-xl bg-danger/15 px-4 py-3 text-sm text-danger-readable">{error}</p>}
 
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+            className="w-full rounded-2xl bg-accent py-4 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
           >
             {busy ? "Conectando…" : "Entrar"}
           </button>
 
-          <p className="text-center text-xs text-white/50">
-            ¿Eres anfitrión? <Link to="/live/host" className="underline hover:text-white">Crear sesión</Link>
+          <p className="text-center text-xs text-ink-soft">
+            ¿Eres anfitrión? <Link to="/live/host" className="underline hover:text-accent">Crear sesión</Link>
           </p>
         </form>
       </main>

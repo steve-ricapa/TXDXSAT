@@ -1,5 +1,27 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { RefreshCw, UserPlus } from "lucide-react";
 import { ApiError } from "@/services/api-client";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  EmptyState,
+  Field,
+  Input,
+  LoadingState,
+  Select,
+  Table,
+  TableWrap,
+  Td,
+  Th,
+  Thead,
+  Tr,
+} from "@/components/ui";
 import { authApi, type AuthUser, type UserRole } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -29,6 +51,7 @@ export function UsersPage() {
   const [role, setRole] = useState<UserRole>("ADMIN");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AuthUser | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,10 +97,12 @@ export function UsersPage() {
     }
   }
 
-  async function remove(target: AuthUser) {
-    if (!window.confirm(`¿Eliminar la cuenta de ${target.name}?`)) return;
+  async function confirmDelete() {
+    const target = pendingDelete;
+    if (!target) return;
     try {
       await authApi.deleteUser(target.id);
+      setPendingDelete(null);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo eliminar el usuario");
@@ -86,161 +111,188 @@ export function UsersPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-extrabold tracking-tight">Usuarios administradores</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Todas las cuentas son administradores. Solo un superadmin puede crearlas.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink">Usuarios administradores</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            Todas las cuentas son administradores. Solo un superadmin puede crearlas.
+          </p>
+        </div>
+        <Badge variant="accent">{users.length} cuentas</Badge>
       </header>
 
-      <section className="card p-5">
-        <h2 className="font-semibold">Crear administrador</h2>
-        <form onSubmit={onCreate} className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-medium">Nombre</span>
-            <input
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-              placeholder="Ana Pérez"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Correo</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-              placeholder="ana@empresa.com"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Contraseña (mín. 10)</span>
-            <input
-              type="password"
-              required
-              minLength={10}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-              placeholder="••••••••••"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Rol</span>
-            <select
-              value={role}
-              onChange={(event) => setRole(event.target.value as UserRole)}
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-            >
-              <option value="ADMIN">Administrador</option>
-              <option value="SUPERADMIN">Superadmin</option>
-            </select>
-          </label>
-
-          {createError && (
-            <p className="sm:col-span-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-              {createError}
-            </p>
-          )}
-
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={creating}
-              className="rounded-xl bg-[var(--color-brand-600)] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--color-brand-700)] disabled:opacity-50"
-            >
-              {creating ? "Creando…" : "Crear cuenta"}
-            </button>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-accent" />
+            <CardTitle>Crear administrador</CardTitle>
           </div>
-        </form>
-      </section>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nombre" htmlFor="new-name" required>
+              <Input
+                id="new-name"
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Ana Pérez"
+              />
+            </Field>
+            <Field label="Correo" htmlFor="new-email" required>
+              <Input
+                id="new-email"
+                type="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="ana@empresa.com"
+              />
+            </Field>
+            <Field label="Contraseña" htmlFor="new-password" hint="Mínimo 10 caracteres." required>
+              <Input
+                id="new-password"
+                type="password"
+                required
+                minLength={10}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••••"
+              />
+            </Field>
+            <Field label="Rol" htmlFor="new-role" required>
+              <Select
+                id="new-role"
+                value={role}
+                onChange={(event) => setRole(event.target.value as UserRole)}
+              >
+                <option value="ADMIN">Administrador</option>
+                <option value="SUPERADMIN">Superadmin</option>
+              </Select>
+            </Field>
 
-      <section className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-black/5 px-5 py-3">
-          <h2 className="font-semibold">Cuentas ({users.length})</h2>
-          <button
-            type="button"
+            {createError && (
+              <div className="sm:col-span-2">
+                <Alert tone="danger">{createError}</Alert>
+              </div>
+            )}
+
+            <div className="sm:col-span-2">
+              <Button type="submit" variant="accent" loading={creating} leftIcon={<UserPlus className="h-4 w-4" />}>
+                Crear cuenta
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-ink">Cuentas</h2>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => void load()}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--color-brand-600)] hover:bg-black/5"
+            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
           >
             Actualizar
-          </button>
+          </Button>
         </div>
 
-        {error && <p className="px-5 py-3 text-sm text-red-700">{error}</p>}
+        {error && <Alert tone="danger">{error}</Alert>}
 
         {loading ? (
-          <p className="px-5 py-6 text-sm text-[var(--color-ink-muted)]">Cargando…</p>
+          <Card>
+            <LoadingState label="Cargando usuarios…" />
+          </Card>
         ) : users.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-[var(--color-ink-muted)]">Aún no hay cuentas.</p>
+          <EmptyState
+            icon={<UserPlus className="h-5 w-5" />}
+            title="Aún no hay cuentas"
+            description="Crea el primer administrador con el formulario de arriba."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-black/[0.03] text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+          <TableWrap>
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-5 py-2 font-semibold">Nombre</th>
-                  <th className="px-5 py-2 font-semibold">Correo</th>
-                  <th className="px-5 py-2 font-semibold">Rol</th>
-                  <th className="px-5 py-2 font-semibold">Estado</th>
-                  <th className="px-5 py-2 font-semibold">Último acceso</th>
-                  <th className="px-5 py-2 font-semibold"></th>
+                  <Th>Nombre</Th>
+                  <Th>Correo</Th>
+                  <Th>Rol</Th>
+                  <Th>Estado</Th>
+                  <Th>Último acceso</Th>
+                  <Th className="text-right">Acciones</Th>
                 </tr>
-              </thead>
+              </Thead>
               <tbody>
                 {users.map((item) => {
                   const isSelf = item.id === currentUser?.id;
                   return (
-                    <tr key={item.id} className="border-t border-black/5">
-                      <td className="px-5 py-3 font-medium">{item.name}</td>
-                      <td className="px-5 py-3 text-[var(--color-ink-muted)]">{item.email}</td>
-                      <td className="px-5 py-3">{ROLE_LABEL[item.role]}</td>
-                      <td className="px-5 py-3">
-                        <span
-                          className={[
-                            "rounded-full px-2 py-0.5 text-xs font-semibold",
-                            item.isActive
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-red-100 text-red-700",
-                          ].join(" ")}
-                        >
+                    <Tr key={item.id}>
+                      <Td className="font-medium">{item.name}</Td>
+                      <Td className="text-ink-muted">{item.email}</Td>
+                      <Td>
+                        <Badge variant={item.role === "SUPERADMIN" ? "accent" : "neutral"}>
+                          {ROLE_LABEL[item.role]}
+                        </Badge>
+                      </Td>
+                      <Td>
+                        <Badge variant={item.isActive ? "success" : "danger"}>
                           {item.isActive ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-[var(--color-ink-muted)]">
-                        {formatDate(item.lastLoginAt)}
-                      </td>
-                      <td className="px-5 py-3">
+                        </Badge>
+                      </Td>
+                      <Td className="text-ink-muted">{formatDate(item.lastLoginAt)}</Td>
+                      <Td>
                         <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             disabled={isSelf}
                             onClick={() => void toggleActive(item)}
-                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-black/5 disabled:opacity-40"
                           >
                             {item.isActive ? "Desactivar" : "Activar"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             disabled={isSelf}
-                            onClick={() => void remove(item)}
-                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
+                            onClick={() => setPendingDelete(item)}
+                            className="text-danger-readable hover:bg-danger/10 hover:text-danger-readable"
                           >
                             Eliminar
-                          </button>
+                          </Button>
                         </div>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableWrap>
         )}
       </section>
+
+      <Dialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Eliminar cuenta"
+        description="Esta acción no se puede deshacer."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void confirmDelete()}>
+              Eliminar
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-muted">
+          ¿Seguro que quieres eliminar la cuenta de{" "}
+          <span className="font-semibold text-ink">{pendingDelete?.name}</span>?
+        </p>
+      </Dialog>
     </div>
   );
 }

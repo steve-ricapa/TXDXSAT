@@ -173,13 +173,13 @@ export function PlayPage() {
         <div className="flex min-w-0 items-center gap-3">
           <Avatar avatar={record.avatar} />
           <div className="min-w-0">
-            <p className="truncate font-bold text-white">{record.username}</p>
-            <p className="truncate text-xs text-white/50">{state?.quizTitle ?? "Sesión en vivo"}</p>
+            <p className="truncate font-bold text-ink">{record.username}</p>
+            <p className="truncate text-xs text-ink-soft">{state?.quizTitle ?? "Sesión en vivo"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {ack && (
-            <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-bold tabular-nums text-white">
+            <span className="game-chip rounded-full px-3 py-1 text-sm font-bold tabular-nums text-ink">
               {ack.totalScore} pts
             </span>
           )}
@@ -188,13 +188,13 @@ export function PlayPage() {
       </header>
 
       {error && (
-        <p className="relative z-10 mt-3 shrink-0 rounded-xl bg-red-500/25 px-4 py-2 text-sm text-red-100">{error}</p>
+        <p className="relative z-10 mt-3 shrink-0 rounded-xl bg-danger/15 px-4 py-2 text-sm text-danger-readable">{error}</p>
       )}
 
       <main className="relative z-10 mt-4 flex min-h-0 flex-1 flex-col">
         {phase === "connecting" && (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-white/70">Conectando…</p>
+            <p className="text-ink-muted">Conectando…</p>
           </div>
         )}
 
@@ -202,21 +202,21 @@ export function PlayPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
             {countdown !== null && countdown > 0 ? (
               <>
-                <span key={countdown} className="drop-in text-[8rem] font-black leading-none text-white">
+                <span key={countdown} className="drop-in text-[8rem] font-black leading-none text-ink">
                   {countdown}
                 </span>
-                <p className="text-lg font-bold text-white/80">¡Preparados!</p>
+                <p className="text-lg font-bold text-ink-muted">¡Preparados!</p>
               </>
             ) : (
               <>
                 <span className="text-5xl">⏳</span>
-                <p className="text-2xl font-black text-white">¡Estás dentro!</p>
-                <p className="max-w-xs text-sm text-white/60">
+                <p className="text-2xl font-black text-ink">¡Estás dentro!</p>
+                <p className="max-w-xs text-sm text-ink-muted">
                   Mira la pantalla del anfitrión. La partida empezará en breve.
                 </p>
-                <div className="mt-2 rounded-2xl bg-black/25 px-6 py-3 backdrop-blur">
-                  <p className="text-xs uppercase tracking-widest text-white/50">PIN</p>
-                  <p className="text-3xl font-black tracking-[0.3em] text-white">{record.pin}</p>
+                <div className="game-panel mt-2 rounded-2xl px-6 py-3">
+                  <p className="text-xs uppercase tracking-widest text-ink-soft">PIN</p>
+                  <p className="text-3xl font-black tracking-[0.3em] text-ink">{record.pin}</p>
                 </div>
               </>
             )}
@@ -225,18 +225,18 @@ export function PlayPage() {
 
         {(phase === "question" || phase === "results") && question && (
           <>
-            <div className="shrink-0 rounded-2xl bg-black/25 px-4 py-3 backdrop-blur">
+            <div className="game-panel shrink-0 rounded-2xl px-4 py-3">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-white/60">
+                <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">
                   Pregunta {question.index + 1} / {question.total}
                 </p>
                 {phase === "question" && (
-                  <span className={`text-sm font-black tabular-nums ${remaining <= 5 ? "text-red-300" : "text-white/70"}`}>
+                  <span className={`text-sm font-black tabular-nums ${remaining <= 5 ? "text-danger" : "text-ink-muted"}`}>
                     {remaining}s
                   </span>
                 )}
               </div>
-              <h1 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">{question.text}</h1>
+              <h1 className="mt-1 text-lg font-black leading-tight text-ink sm:text-xl">{question.text}</h1>
             </div>
 
             <div className="mt-3 min-h-0 flex-1">
@@ -249,29 +249,35 @@ export function PlayPage() {
           <div className="pop-in mt-3 min-h-0 flex-1 overflow-y-auto">
             <div
               className={`flex flex-col items-center gap-2 rounded-3xl px-5 py-6 text-center ${
-                correct ? "bg-emerald-500" : "bg-rose-600"
+                correct ? "bg-success text-[#04200f]" : "bg-danger text-white"
               }`}
             >
               <span className="text-5xl">{correct ? "✅" : "❌"}</span>
-              <p className="text-2xl font-black text-white">{correct ? "¡Correcto!" : "Incorrecto"}</p>
+              <p className={`text-2xl font-black ${correct ? "text-[#04200f]" : "text-white"}`}>
+                {correct ? "¡Correcto!" : "Incorrecto"}
+              </p>
               {ack && (
-                <p className="text-sm font-bold text-white/80">
+                <p className={`text-sm font-bold ${correct ? "text-[#04200f]/80" : "text-white/85"}`}>
                   +{ack.score} pts · total {ack.totalScore}
                 </p>
               )}
               {!correct && results.correctDisplayIndices.length > 0 && (
-                <div className="mt-1 flex items-center gap-2 text-sm text-white/90">
+                <div className={`mt-1 flex items-center gap-2 text-sm ${correct ? "text-[#04200f]" : "text-white/90"}`}>
                   <span>Respuesta correcta:</span>
                   {results.correctDisplayIndices.map((slot) => (
                     <AnswerShape key={slot} shape={paletteFor(slot).shape} className="h-4 w-4" />
                   ))}
                 </div>
               )}
-              {results.explanation && <p className="mt-1 text-xs text-white/80">{results.explanation}</p>}
+              {results.explanation && (
+                <p className={`mt-1 text-xs ${correct ? "text-[#04200f]/80" : "text-white/85"}`}>
+                  {results.explanation}
+                </p>
+              )}
             </div>
 
-            <section className="mt-4 rounded-2xl bg-black/25 p-4 backdrop-blur">
-              <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-white/60">Clasificación</h2>
+            <section className="game-panel mt-4 rounded-2xl p-4">
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-ink-muted">Clasificación</h2>
               <Leaderboard entries={leaderboard} highlightPlayerId={record.playerId} maxRows={6} />
             </section>
           </div>
@@ -281,11 +287,11 @@ export function PlayPage() {
           <div className="relative flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto text-center">
             <Confetti pieces={60} />
             <span className="text-6xl">{myRank?.rank === 1 ? "🏆" : "🎉"}</span>
-            <p className="text-3xl font-black text-white">¡Has quedado #{myRank?.rank ?? "—"}!</p>
-            <p className="text-lg font-bold text-white/80">
+            <p className="text-3xl font-black text-ink">¡Has quedado #{myRank?.rank ?? "—"}!</p>
+            <p className="text-lg font-bold text-ink-muted">
               {myRank?.score ?? 0} puntos · {myRank?.correctAnswers ?? 0}/{myRank?.totalAnswers ?? 0} correctas
             </p>
-            <div className="mt-2 w-full rounded-2xl bg-black/25 p-4 text-left backdrop-blur">
+            <div className="game-panel mt-2 w-full rounded-2xl p-4 text-left">
               <Leaderboard entries={ended?.leaderboard ?? []} highlightPlayerId={record.playerId} maxRows={10} />
             </div>
           </div>
