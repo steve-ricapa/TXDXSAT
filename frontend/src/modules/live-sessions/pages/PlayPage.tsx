@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { getSocket } from "@/services/socket";
+import { useAuth } from "@/modules/auth/context/AuthContext";
+import { getToken } from "@/modules/auth/lib/auth-store";
 import { Avatar } from "../components/Avatar";
 import { AnswerShape } from "../components/AnswerShape";
 import { Confetti } from "../components/Confetti";
@@ -28,11 +30,13 @@ type Phase = "connecting" | "lobby" | "question" | "results" | "ended";
 
 /** Player gameplay screen (`/live/play/:sessionId`). Mobile-first, no scroll. */
 export function PlayPage() {
+  const { user } = useAuth();
   const { sessionId = "" } = useParams();
   const stored = playerStore.load(sessionId);
+  const owned = stored?.userId === user?.id ? stored : null;
   const socket = getSocket();
 
-  const [record, setRecord] = useState<StoredPlayer | null>(stored);
+  const [record, setRecord] = useState<StoredPlayer | null>(owned);
   const [phase, setPhase] = useState<Phase>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState<PublicQuestion | null>(null);
@@ -49,12 +53,13 @@ export function PlayPage() {
 
   // (Re)join on mount using the persisted playerId.
   useEffect(() => {
-    if (!record || joinedRef.current) return;
+    if (!record || record.userId !== user?.id || joinedRef.current) return;
     joinedRef.current = true;
 
     const onJoined = (payload: PlayerJoinedAckPayload) => {
       playerStore.save({
         playerId: payload.playerId,
+        userId: record.userId,
         sessionId: payload.sessionId,
         pin: record.pin,
         username: payload.username,
@@ -72,19 +77,24 @@ export function PlayPage() {
     socket.on(ServerEvents.playerJoinedAck, onJoined);
     socket.on(ServerEvents.error, onError);
     socket.on(ServerEvents.playerError, onError);
-    socket.emit(ClientEvents.playerJoin, {
+    const rejoin = () => socket.emit(ClientEvents.playerJoin, {
       pin: record.pin,
       username: record.username,
       avatar: record.avatar,
       playerId: record.playerId,
+      token: getToken(),
     });
+    if (socket.connected) rejoin();
+    socket.on("connect", rejoin);
 
     return () => {
+      joinedRef.current = false;
       socket.off(ServerEvents.playerJoinedAck, onJoined);
       socket.off(ServerEvents.error, onError);
       socket.off(ServerEvents.playerError, onError);
+      socket.off("connect", rejoin);
     };
-  }, [record, socket]);
+  }, [record, socket, user?.id]);
 
   useSocketEvent<SessionStatePayload>(ServerEvents.sessionState, (payload) => {
     setState(payload);
@@ -160,7 +170,7 @@ export function PlayPage() {
     [question, socket],
   );
 
-  if (!record) return <Navigate to="/live/join" replace />;
+  if (!record || record.userId !== user?.id) return <Navigate to={stored?.pin ? `/live/join?pin=${stored.pin}` : "/live/join"} replace />;
 
   const myRank = ended?.leaderboard.find((entry) => entry.playerId === record.playerId);
   const correct = ack?.isCorrect === true;

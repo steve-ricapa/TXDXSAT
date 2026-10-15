@@ -42,6 +42,8 @@ export interface GameEngineOptions {
 
 export interface JoinPlayerInput {
   sessionId: string;
+  userId: string;
+  tenantId: string | null;
   username: string;
   avatar?: string | undefined;
   playerId?: string | undefined;
@@ -160,6 +162,7 @@ export class GameEngine {
     for (const snapshot of players) {
       session.players.set(snapshot.playerId, {
         id: snapshot.playerId,
+        userId: snapshot.userId,
         username: snapshot.username,
         avatar: snapshot.avatar,
         score: snapshot.score,
@@ -218,6 +221,9 @@ export class GameEngine {
 
     const session = await this.ensureLoaded(input.sessionId);
     await this.hydratePlayers(session);
+    if (session.tenantId !== input.tenantId) {
+      throw new ForbiddenError("This session belongs to another organization");
+    }
 
     if (session.status === "FINISHED") {
       throw new ConflictError("This session has already finished");
@@ -227,14 +233,18 @@ export class GameEngine {
     let reconnected = false;
 
     if (input.playerId) {
-      player = session.players.get(input.playerId);
+      const requested = session.players.get(input.playerId);
+      if (requested && requested.userId !== input.userId) {
+        throw new ForbiddenError("Player does not belong to this account");
+      }
     }
+    player = [...session.players.values()].find((candidate) => candidate.userId === input.userId);
+    // Display names are mutable, but must never collide with another player.
+    const clash = [...session.players.values()].some(
+      (candidate) => candidate.userId !== input.userId && normalizeText(candidate.username) === normalizeText(username),
+    );
+    if (clash) throw new ConflictError("That name is already taken in this session");
     if (!player) {
-      // Reject a name already taken (case-insensitive) to avoid impersonation.
-      const clash = [...session.players.values()].some(
-        (p) => normalizeText(p.username) === normalizeText(username),
-      );
-      if (clash) throw new ConflictError("That name is already taken in this session");
       if (session.players.size >= this.readonlyMaxPlayers) {
         throw new ConflictError("This session is full");
       }
@@ -245,6 +255,7 @@ export class GameEngine {
     const persistedId = await this.store.upsertPlayer({
       sessionId: session.id,
       tenantId: session.tenantId,
+      userId: input.userId,
       username,
       avatar: avatar ?? player?.avatar ?? "shield",
     });
@@ -252,6 +263,7 @@ export class GameEngine {
     const now = Date.now();
     player = {
       id: persistedId,
+      userId: input.userId,
       username,
       avatar: avatar ?? player?.avatar ?? "shield",
       score: player?.score ?? 0,

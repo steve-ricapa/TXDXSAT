@@ -51,7 +51,7 @@ export interface LiveSessionStore {
     tenantId: string | null;
     questions: NewQuestionInput[];
   }): Promise<{ id: string; questionCount: number }>;
-  listQuizzes(): Promise<QuizSummary[]>;
+  listQuizzes(filter?: { tenantId?: string | null }): Promise<QuizSummary[]>;
   getQuizTitle(quizId: string): Promise<string | null>;
   getQuizDetail(quizId: string): Promise<QuizDetail | null>;
   updateQuiz(
@@ -69,10 +69,19 @@ export interface LiveSessionStore {
     viewToken: string;
   }): Promise<SessionRecord & { questions: QuizQuestion[] }>;
   getQuizQuestions(quizId: string): Promise<QuizQuestion[]>;
-  getPlayers(sessionId: string): Promise<PlayerSnapshot[]>;
+  getPlayers(sessionId: string): Promise<(PlayerSnapshot & { userId: string | null })[]>;
+  getResultsForUser(userId: string, tenantId: string | null): Promise<Array<{
+    sessionId: string;
+    quizTitle: string;
+    status: LiveSessionStatus;
+    score: number;
+    answers: number;
+    finishedAt: string | null;
+  }>>;
   upsertPlayer(input: {
     sessionId: string;
     tenantId: string | null;
+    userId: string;
     username: string;
     avatar: string;
   }): Promise<string>;

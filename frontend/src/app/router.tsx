@@ -27,7 +27,7 @@ export function resolveBasename(baseUrl: string): string {
 /** Keep the signed-in entry point stable while routing to the appropriate portal. */
 function DashboardEntry() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === "SUPERADMIN" ? "/superadmin" : "/admin"} replace />;
+  return <Navigate to={user?.role === "SUPERADMIN" ? "/superadmin" : user?.role === "EMPLOYEE" ? "/employee" : "/admin"} replace />;
 }
 
 export const router = createBrowserRouter(
@@ -44,7 +44,7 @@ export const router = createBrowserRouter(
     {
       element: <AppShell />,
       children: [
-        { path: "employee", element: <EmployeeHome /> },
+        { path: "employee", element: <ProtectedRoute><EmployeeHome /></ProtectedRoute> },
         {
           path: "admin",
           element: (
@@ -72,7 +72,7 @@ export const router = createBrowserRouter(
         {
           path: "live/editor",
           element: (
-            <ProtectedRoute>
+            <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
               <QuizEditorPage />
             </ProtectedRoute>
           ),
@@ -82,14 +82,13 @@ export const router = createBrowserRouter(
     },
     // Login renders full-screen, outside the corporate shell.
     { path: "login", element: <LoginPage /> },
-    // Live sessions render full-screen. Joining/playing/presenting is public
-    // (PIN/token based); hosting and authoring require a session.
-    { path: "live/join", element: <JoinPage /> },
-    { path: "live/play/:sessionId", element: <PlayPage /> },
+    // Players must be authenticated; host/presenter retain their capability tokens.
+    { path: "live/join", element: <ProtectedRoute><JoinPage /></ProtectedRoute> },
+    { path: "live/play/:sessionId", element: <ProtectedRoute><PlayPage /></ProtectedRoute> },
     {
       path: "live/host",
       element: (
-        <ProtectedRoute>
+        <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
           <HostPage />
         </ProtectedRoute>
       ),

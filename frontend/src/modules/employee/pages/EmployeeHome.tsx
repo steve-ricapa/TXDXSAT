@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { myLiveResults, type MyLiveResult } from "@/modules/live-sessions/lib/api";
 import {
   Award,
   BookOpen,
@@ -50,6 +53,18 @@ const badges = [
 export function EmployeeHome() {
   const { user } = useAuth();
   const firstName = user?.name.split(" ")[0];
+  const [results, setResults] = useState<MyLiveResult[]>([]);
+  const [resultsError, setResultsError] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    myLiveResults().then(({ results: entries }) => {
+      if (mounted) setResults(entries);
+    }).catch(() => {
+      if (mounted) setResultsError(true);
+    });
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -62,14 +77,31 @@ export function EmployeeHome() {
             Hola{firstName ? `, ${firstName}` : ""} 👋
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Continúa tu formación en ciberseguridad y gana insignias.
+            Participa en sesiones en vivo y revisa tus resultados.
           </p>
         </div>
         <Badge variant="accent">
           <Sparkles className="h-3.5 w-3.5" />
-          Nivel: Guardián
+          Vista demo · nivel Guardián
         </Badge>
       </header>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-ink">Mis sesiones en vivo</h2>
+          <Link to="/live/join" className={buttonClass({ variant: "accent", size: "sm" })}>Entrar con PIN</Link>
+        </div>
+        {resultsError ? <p className="text-sm text-ink-muted">No se pudieron cargar tus resultados. Vuelve a intentarlo más tarde.</p> : results.length === 0 ? <p className="border border-border p-5 text-sm text-ink-muted">Aún no tienes sesiones asociadas a tu cuenta.</p> : (
+          <div className="divide-y divide-border border-y border-border">
+            {results.map((result) => <div key={result.sessionId} className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm">
+              <div><p className="font-semibold text-ink">{result.quizTitle}</p><p className="text-ink-muted">{result.finishedAt ? new Date(result.finishedAt).toLocaleDateString("es") : "Sesión en curso"} · {result.answers} respuestas</p></div>
+              <span className="font-bold tabular-nums text-accent">{result.status === "FINISHED" ? `${result.score} pts` : "Puntuación pendiente"}</span>
+            </div>)}
+          </div>
+        )}
+      </section>
+
+      <p className="border-t border-border pt-5 text-sm text-ink-muted">Los cursos, métricas e insignias a continuación son una demostración; no representan tu progreso real.</p>
 
       <section className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Progreso global" value="53%" hint="Meta del trimestre: 80%" icon={<TrendingUp className="h-4 w-4" />} />
@@ -78,7 +110,7 @@ export function EmployeeHome() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-bold text-ink">Mis capacitaciones</h2>
+        <h2 className="text-lg font-bold text-ink">Capacitaciones · ejemplo</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {courses.map((course) => {
             const locked = course.status === "locked";
@@ -121,7 +153,7 @@ export function EmployeeHome() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-bold text-ink">Insignias</h2>
+        <h2 className="text-lg font-bold text-ink">Insignias · ejemplo</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {badges.map((badge) => (
             <Card

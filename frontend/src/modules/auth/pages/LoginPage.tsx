@@ -53,7 +53,7 @@ export function LoginPage() {
           <h1 className="mt-4 text-2xl font-black tracking-tight text-ink">
             TXDX<span className="text-accent">SAT</span>
           </h1>
-          <p className="mt-1 text-sm text-ink-muted">Acceso al panel de administración</p>
+          <p className="mt-1 text-sm text-ink-muted">Acceso a tu cuenta TXDXSAT</p>
         </div>
 
         <Card className="p-7">

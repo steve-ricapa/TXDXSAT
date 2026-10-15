@@ -5,7 +5,7 @@ import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Field, 
 import { authApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
-const ROLE_LABEL = { SUPERADMIN: "Superadmin", ADMIN: "Administrador" } as const;
+const ROLE_LABEL = { SUPERADMIN: "Superadmin", ADMIN: "Administrador", EMPLOYEE: "Colaborador" } as const;
 
 /** Self-service account screen: profile, password change and sign out. */
 export function AccountPage() {

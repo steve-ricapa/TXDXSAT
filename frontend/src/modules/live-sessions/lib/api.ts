@@ -35,6 +35,21 @@ export interface PersistedResults {
   }>;
 }
 
+export interface MyLiveResult {
+  sessionId: string;
+  quizTitle: string;
+  status: "WAITING" | "ACTIVE" | "FINISHED";
+  score: number;
+  answers: number;
+  correctCount?: number;
+  accuracyRate?: number;
+  finishedAt: string | null;
+}
+
+export function myLiveResults(): Promise<{ results: MyLiveResult[] }> {
+  return api.get("/live/me/results");
+}
+
 /** A question as sent to the authoring API (server validates with Zod). */
 export interface QuizQuestionInput {
   type: QuestionType;
@@ -75,7 +90,10 @@ export interface QuizDetail {
 }
 
 export const liveApi = {
-  listQuizzes: () => api.get<{ quizzes: QuizSummary[] }>("/live/quizzes"),
+  listQuizzes: (tenantId?: string | null) =>
+    api.get<{ quizzes: QuizSummary[] }>(
+      tenantId ? `/live/quizzes?tenantId=${tenantId}` : "/live/quizzes",
+    ),
   getQuizDetail: (id: string) => api.get<QuizDetail>(`/live/quizzes/${id}`),
   createQuiz: (payload: QuizPayload) =>
     api.post<{ id: string; questionCount: number }>("/live/quizzes", payload),
@@ -84,7 +102,8 @@ export const liveApi = {
       method: "PUT",
       body: payload,
     }),
-  createSession: (quizId: string) => api.post<CreateSessionResult>("/live/sessions", { quizId }),
+  createSession: (quizId: string, tenantId?: string | null) =>
+    api.post<CreateSessionResult>("/live/sessions", { quizId, tenantId }),
   getResults: (sessionId: string, token: string) =>
     api.get<PersistedResults>(`/live/sessions/${sessionId}/results`, {
       headers: { "x-session-token": token },

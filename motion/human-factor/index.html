@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280, height=720" />
+  <title>El factor humano · TXDXSAT</title>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #080f1e; color: #f3f7fc; font-family: system-ui, sans-serif; }
+    #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #080f1e; }
+    .frame { position: absolute; inset: 0; padding: 54px 76px; }
+    .eyebrow { margin: 0; color: #00c7be; text-transform: uppercase; letter-spacing: .18em; font-size: 15px; }
+    .title { max-width: 900px; margin: 22px 0 0; font-size: 40px; line-height: 1.15; font-weight: 650; }
+    svg { position: absolute; left: 80px; top: 200px; width: 1120px; height: 320px; overflow: visible; }
+    .node { color: #00c7be; }
+    .node circle { fill: #101c30; stroke: currentColor; stroke-width: 3; }
+    .node path { fill: none; stroke: currentColor; stroke-width: 3; }
+    #broken, #alert, #mail, #training, #restored { opacity: 0; }
+    .path { fill: none; stroke: #263b55; stroke-width: 3; }
+    .pulse { fill: none; stroke: #00c7be; stroke-width: 4; stroke-dasharray: 20 480; }
+    .alert-path { fill: none; stroke: #ef6666; stroke-width: 4; stroke-dasharray: 20 480; }
+    #mail text, #training text, #restored text { fill: #f3f7fc; font-size: 18px; }
+    .caption { position: absolute; bottom: 65px; left: 76px; right: 76px; height: 66px; padding-top: 20px; border-top: 1px solid #263b55; font-size: 24px; }
+    .caption span { display: block; opacity: 0; position: absolute; top: 20px; }
+  </style>
+</head>
+<body>
+  <div data-hf-id="hf-euxq" id="root" data-composition-id="human-factor" data-start="0" data-duration="16" data-width="1280" data-height="720">
+    <section data-hf-id="hf-8gkr" id="human-factor-scene" class="frame">
+      <p data-hf-id="hf-4z0p" class="eyebrow">TXDXSAT / El factor humano</p>
+      <h1 data-hf-id="hf-kynw" class="title">La seguridad también depende de las decisiones de tu equipo.</h1>
+      <svg data-hf-id="hf-p5o1" viewBox="0 0 1120 320" aria-hidden="true">
+        <path data-hf-id="hf-qgps" class="path" d="M100 162H1020" />
+        <path data-hf-id="hf-n2k9" id="broken" d="M522 162H598" stroke="#080f1e" stroke-width="10" />
+        <path data-hf-id="hf-2uc3" id="safe-pulse" class="pulse" d="M100 162H1020" />
+        <path data-hf-id="hf-s6a7" id="alert" class="alert-path" d="M560 162H1020" />
+        <g data-hf-id="hf-p6gq" id="people">
+          <g data-hf-id="hf-atbs" class="node" transform="translate(100 162)"><circle data-hf-id="hf-eiv4" r="36"/><path data-hf-id="hf-8vr1" d="M-10 14q0-13 10-13t10 13M0-5a8 8 0 1 0 0-16 8 8 0 0 0 0 16"/></g>
+          <g data-hf-id="hf-s5z1" class="node" transform="translate(330 162)"><circle data-hf-id="hf-k5x4" r="36"/><path data-hf-id="hf-1m1d" d="M-10 14q0-13 10-13t10 13M0-5a8 8 0 1 0 0-16 8 8 0 0 0 0 16"/></g>
+          <g data-hf-id="hf-84jt" id="target" class="node" transform="translate(560 162)"><circle data-hf-id="hf-iz01" r="36"/><path data-hf-id="hf-2syg" d="M-10 14q0-13 10-13t10 13M0-5a8 8 0 1 0 0-16 8 8 0 0 0 0 16"/></g>
+          <g data-hf-id="hf-g6hz" class="node" transform="translate(790 162)"><circle data-hf-id="hf-jdb2" r="36"/><path data-hf-id="hf-2enf" d="M-10 14q0-13 10-13t10 13M0-5a8 8 0 1 0 0-16 8 8 0 0 0 0 16"/></g>
+          <g data-hf-id="hf-lamy" class="node" transform="translate(1020 162)"><circle data-hf-id="hf-i6dz" r="36"/><path data-hf-id="hf-0f4a" d="M-10 14q0-13 10-13t10 13M0-5a8 8 0 1 0 0-16 8 8 0 0 0 0 16"/></g>
+        </g>
+        <g data-hf-id="hf-4pne" id="mail" transform="translate(510 0)"><rect data-hf-id="hf-bhne" width="100" height="68" rx="2" fill="#101c30" stroke="#ef6666" stroke-width="3"/><path data-hf-id="hf-tf6d" d="m5 7 45 35L95 7" fill="none" stroke="#ef6666" stroke-width="3"/><text data-hf-id="hf-nghx" x="120" y="42">Correo sospechoso</text></g>
+        <g data-hf-id="hf-v60g" id="training" transform="translate(400 245)"><rect data-hf-id="hf-vga2" width="320" height="66" fill="#101c30" stroke="#00c7be" stroke-width="2"/><text data-hf-id="hf-0s4o" x="24" y="42">Identificar · Evaluar · Aprender ✓</text></g>
+        <g data-hf-id="hf-mc8c" id="restored" transform="translate(530 7)"><path data-hf-id="hf-dro0" d="M30 0 60 12v26c0 20-12 35-30 44C12 73 0 58 0 38V12Z" fill="#101c30" stroke="#00c7be" stroke-width="3"/><path data-hf-id="hf-mnil" d="m16 39 11 10 20-23" fill="none" stroke="#00c7be" stroke-width="3"/><text data-hf-id="hf-hntw" x="80" y="43">Cultura de seguridad</text></g>
+      </svg>
+      <div data-hf-id="hf-gsc6" class="caption"><span data-hf-id="hf-zi3v" id="c1">Cinco personas. Una cadena compartida.</span><span data-hf-id="hf-ibic" id="c2">Un enlace sospechoso afecta a la organización.</span><span data-hf-id="hf-p51m" id="c3">La alerta se propaga sin dramatismos.</span><span data-hf-id="hf-7tul" id="c4">Practicar permite reconocer la señal.</span><span data-hf-id="hf-vwhm" id="c5">El conocimiento fortalece cada eslabón.</span></div>
+    </section>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#people .node", { opacity: 0, scale: .7, transformOrigin: "center" }, { opacity: 1, scale: 1, duration: .55, stagger: .18, ease: "power2.out" }, 0.25);
+    tl.fromTo("#safe-pulse", { strokeDashoffset: 0 }, { strokeDashoffset: -940, duration: 3, ease: "none" }, 1);
+    tl.fromTo("#c1", { opacity: 0 }, { opacity: 1, duration: .4 }, .5).to("#c1", { opacity: 0, duration: .3 }, 3.1);
+    tl.to("#mail", { opacity: 1, duration: .4 }, 3.5);
+    tl.fromTo("#c2", { opacity: 0 }, { opacity: 1, duration: .4 }, 3.7).to("#c2", { opacity: 0, duration: .3 }, 6);
+    tl.to("#target", { color: "#ef6666", duration: .5 }, 4.8);
+    tl.to("#broken", { opacity: 1, duration: .35 }, 6.1);
+    tl.to("#alert", { opacity: 1, duration: .2 }, 6.3);
+    tl.fromTo("#alert", { strokeDashoffset: 0 }, { strokeDashoffset: -480, duration: 2, ease: "none" }, 6.4);
+    tl.fromTo("#c3", { opacity: 0 }, { opacity: 1, duration: .3 }, 6.4).to("#c3", { opacity: 0, duration: .3 }, 8.7);
+    tl.to("#mail", { opacity: 0, duration: .4 }, 9);
+    tl.to("#training", { opacity: 1, duration: .5 }, 9);
+    tl.fromTo("#c4", { opacity: 0 }, { opacity: 1, duration: .3 }, 9).to("#c4", { opacity: 0, duration: .3 }, 11.7);
+    tl.to("#target", { color: "#00c7be", duration: .6 }, 12);
+    tl.to(["#broken", "#alert", "#training"], { opacity: 0, duration: .6 }, 12);
+    tl.to("#restored", { opacity: 1, duration: .6 }, 12.8);
+    tl.fromTo("#c5", { opacity: 0 }, { opacity: 1, duration: .45 }, 13);
+    window.__timelines["human-factor"] = tl;
+  </script>
+</body>
+</html>

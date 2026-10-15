@@ -9,6 +9,7 @@ import {
 } from "react";
 import { authApi, setToken, type AuthUser } from "../lib/api";
 import { getToken, subscribeToken } from "../lib/auth-store";
+import { disconnectSocket } from "@/services/socket";
 
 export type AuthStatus = "loading" | "authenticated" | "anonymous";
 
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () =>
       subscribeToken(() => {
         if (!getToken()) {
+          disconnectSocket();
           setUser(null);
           setStatus("anonymous");
         }
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await authApi.login(email, password);
+    disconnectSocket();
     setToken(result.token);
     setUser(result.user);
     setStatus("authenticated");
@@ -77,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* even if the call fails, drop the local session */
     }
     setToken(null);
+    disconnectSocket();
     setUser(null);
     setStatus("anonymous");
   }, []);

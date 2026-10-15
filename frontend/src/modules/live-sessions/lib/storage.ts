@@ -12,6 +12,7 @@ const HOST_PREFIX = "txdxsat:live:host:";
 
 export interface StoredPlayer {
   playerId: string;
+  userId: string;
   sessionId: string;
   pin: string;
   username: string;

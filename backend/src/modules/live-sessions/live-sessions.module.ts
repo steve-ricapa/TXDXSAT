@@ -1,5 +1,7 @@
 import type { Logger } from "pino";
 import type { EventPublisher } from "../../events/publishers/event-publisher.ts";
+import { AuthenticateUseCase } from "../auth/application/auth.usecases.ts";
+import { AuthRepository } from "../auth/infrastructure/auth.repository.ts";
 import type { DatabaseClient } from "../../shared/database/prisma.ts";
 import type { DomainEvent } from "../../events/contracts/domain-event.ts";
 import { GameEngine, type GameEngineOptions } from "./application/game-engine.ts";
@@ -80,6 +82,7 @@ export function createLiveSessionModule(
   const engine = new GameEngine(repository, sink, deferred, deps.logger, config.engine ?? {});
 
   const useCases = {
+    store: repository,
     createQuiz: new CreateQuizUseCase(repository),
     listQuizzes: new ListQuizzesUseCase(repository),
     getQuizDetail: new GetQuizDetailUseCase(repository),
@@ -96,7 +99,7 @@ export function createLiveSessionModule(
     attachRealtime: (io: import("socket.io").Server) => {
       const broadcaster = new SocketGameBroadcaster(io);
       deferred.setTarget(broadcaster);
-      registerLiveSessionSocketHandlers(io, engine, deps.logger);
+      registerLiveSessionSocketHandlers(io, engine, deps.logger, new AuthenticateUseCase(new AuthRepository()));
     },
   };
 }

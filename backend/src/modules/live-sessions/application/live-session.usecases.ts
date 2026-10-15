@@ -131,8 +131,8 @@ export class UpdateQuizUseCase {
 export class ListQuizzesUseCase {
   constructor(private readonly store: LiveSessionStore) {}
 
-  async execute(): Promise<QuizSummary[]> {
-    return this.store.listQuizzes();
+  async execute(filter?: { tenantId?: string | null }): Promise<QuizSummary[]> {
+    return this.store.listQuizzes(filter);
   }
 }
 

@@ -3,12 +3,15 @@ import type { Logger } from "pino";
 import { AppError, ForbiddenError, NotFoundError } from "../../../shared/errors/app-error.ts";
 import { ClientEvents, ServerEvents } from "../domain/protocol.ts";
 import type { GameEngine } from "../application/game-engine.ts";
+import type { AuthenticateUseCase } from "../../auth/application/auth.usecases.ts";
 import { Rooms } from "../infrastructure/socket-broadcaster.ts";
 
 interface LiveSocketData {
   role?: "host" | "presenter" | "player";
   sessionId?: string;
   playerId?: string;
+  userId?: string;
+  sessionToken?: string;
 }
 
 /** Register live-session Socket.IO handlers on the provided server. */
@@ -16,6 +19,7 @@ export function registerLiveSessionSocketHandlers(
   io: SocketServer,
   engine: GameEngine,
   logger: Logger,
+  authenticate: AuthenticateUseCase,
 ): void {
   // Per-connection PIN brute-force guard: a socket may only fail a join a few
   // times before it is dropped. In-memory is sufficient because a reconnect
@@ -67,6 +71,9 @@ export function registerLiveSessionSocketHandlers(
 
     socket.on(ClientEvents.playerJoin, async (payload: any) => {
       try {
+        if (data.role && data.role !== "player") throw new ForbiddenError("This connection has another role");
+        const token = typeof payload?.token === "string" ? payload.token : null;
+        const user = await authenticate.execute(token);
         const pin = String(payload?.pin ?? "");
         const username = String(payload?.username ?? "");
         const avatar = payload?.avatar;
@@ -74,9 +81,17 @@ export function registerLiveSessionSocketHandlers(
 
         const session = await engine.findByPin(pin);
         if (!session) throw new NotFoundError("No live session with that PIN");
+        if (data.sessionId && data.sessionId !== session.id) {
+          throw new ForbiddenError("Reconnect before joining another session");
+        }
+        if (data.userId && data.userId !== user.id) {
+          throw new ForbiddenError("Reconnect after switching accounts");
+        }
 
         const { player, reconnected } = await engine.joinPlayer({
           sessionId: session.id,
+          userId: user.id,
+          tenantId: user.tenantId,
           username,
           avatar,
           playerId: playerId ? String(playerId) : undefined,
@@ -86,6 +101,8 @@ export function registerLiveSessionSocketHandlers(
         data.role = "player";
         data.sessionId = session.id;
         data.playerId = player.id;
+        data.userId = user.id;
+        data.sessionToken = token ?? undefined;
         await socket.join(Rooms.session(session.id));
         await socket.join(Rooms.player(player.id));
 
@@ -162,6 +179,11 @@ export function registerLiveSessionSocketHandlers(
         }
         if (engine.playerForSocket(sessionId, socket.id) !== playerId) {
           throw new ForbiddenError("Socket is not bound to this player");
+        }
+        const user = await authenticate.execute(data.sessionToken);
+        const authenticatedSession = await engine.ensureLoaded(sessionId);
+        if (user.id !== data.userId || user.id !== authenticatedSession.players.get(playerId)?.userId || user.tenantId !== authenticatedSession.tenantId) {
+          throw new ForbiddenError("Player does not belong to this account");
         }
         const { session, record } = await engine.submitAnswer({
           sessionId,

@@ -46,6 +46,9 @@ export const createUserSchema = z.object({
   name: z.string().trim().min(1).max(120),
   role: z.enum(USER_ROLES).default("ADMIN"),
   tenantId: z.string().uuid().nullish(),
+}).refine((value) => value.role !== "EMPLOYEE" || !!value.tenantId, {
+  message: "Employee accounts require a tenant ID",
+  path: ["tenantId"],
 });
 
 export const updateUserSchema = z
@@ -199,11 +202,14 @@ export class UpdateUserUseCase {
 
     // A superadmin must not strand the platform without an operator, and must
     // not lock themselves out by mistake.
-    if (target.role === "SUPERADMIN" && (patch.role === "ADMIN" || patch.isActive === false)) {
+    if (target.role === "SUPERADMIN" && ((patch.role !== undefined && patch.role !== "SUPERADMIN") || patch.isActive === false)) {
       await this.assertNotLastSuperadmin(target.id);
       if (target.id === actor.id) {
         throw new ValidationError("You cannot demote or disable your own account");
       }
+    }
+    if ((patch.role ?? target.role) === "EMPLOYEE" && !(patch.tenantId !== undefined ? patch.tenantId : target.tenantId)) {
+      throw new ValidationError("Employee accounts require a tenant ID");
     }
 
     const update: Parameters<AuthStore["updateUser"]>[1] = {};

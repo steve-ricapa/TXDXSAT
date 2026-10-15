@@ -47,6 +47,7 @@ export interface QuizQuestion {
 
 export interface QuizSummary {
   id: string;
+  tenantId?: string | null;
   title: string;
   description: string | null;
   questionCount: number;
@@ -138,6 +139,7 @@ export interface EngineSession {
 
 export interface EnginePlayer {
   id: string;
+  userId: string | null;
   username: string;
   avatar: string;
   score: number;

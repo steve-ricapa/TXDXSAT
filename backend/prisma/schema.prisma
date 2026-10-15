@@ -97,6 +97,7 @@ model EventConsumption {
 enum UserRole {
   SUPERADMIN
   ADMIN
+  EMPLOYEE
 }
 
 model User {
@@ -111,6 +112,7 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   sessions     Session[]
+  livePlayers  LivePlayer[]
   @@index([tenantId])
   @@map("users")
 }
@@ -226,6 +228,7 @@ model LivePlayer {
   id         String   @id @default(uuid()) @db.Uuid
   sessionId  String   @map("session_id") @db.Uuid
   tenantId   String?  @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
   username   String   @db.VarChar(30)
   avatar     String   @default("shield") @db.VarChar(40)
   score      Int      @default(0)
@@ -233,9 +236,11 @@ model LivePlayer {
   lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
 
   session LiveSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?        @relation(fields: [userId], references: [id], onDelete: Restrict)
   answers LiveAnswer[]
 
   @@unique([sessionId, username])
+  @@unique([sessionId, userId])
   @@index([sessionId])
   @@index([tenantId])
   @@map("live_players")
@@ -300,3 +305,14 @@ model MediaAsset {
   @@index([questionId])
   @@map("media_assets")
 }
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(120)
+  slug      String   @unique @db.VarChar(60)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("tenants")
+}
+

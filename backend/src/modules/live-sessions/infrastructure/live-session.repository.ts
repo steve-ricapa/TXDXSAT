@@ -139,11 +139,22 @@ export class LiveSessionRepository implements LiveSessionStore {
     return { id: quiz.id, questionCount: quiz._count.questions };
   }
 
-  async listQuizzes(): Promise<QuizSummary[]> {
+  async listQuizzes(filter?: { tenantId?: string | null }): Promise<QuizSummary[]> {
+    const where: Prisma.QuizWhereInput = {};
+    if (filter && filter.tenantId !== undefined) {
+      if (filter.tenantId === null) {
+        where.tenantId = null;
+      } else {
+        where.OR = [{ tenantId: filter.tenantId }, { tenantId: null }];
+      }
+    }
+
     const rows = await prisma.quiz.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
+        tenantId: true,
         title: true,
         description: true,
         createdAt: true,
@@ -152,6 +163,7 @@ export class LiveSessionRepository implements LiveSessionStore {
     });
     return rows.map((row) => ({
       id: row.id,
+      tenantId: row.tenantId,
       title: row.title,
       description: row.description,
       questionCount: row._count.questions,
@@ -336,22 +348,24 @@ export class LiveSessionRepository implements LiveSessionStore {
       : null;
   }
 
-  /** Insert or update a player by (sessionId, username); returns its id. */
+  /** One durable player per authenticated account and live session. */
   async upsertPlayer(input: {
     sessionId: string;
     tenantId: string | null;
+    userId: string;
     username: string;
     avatar: string;
   }): Promise<string> {
     const player = await prisma.livePlayer.upsert({
-      where: { sessionId_username: { sessionId: input.sessionId, username: input.username } },
+      where: { sessionId_userId: { sessionId: input.sessionId, userId: input.userId } },
       create: {
         sessionId: input.sessionId,
         tenantId: input.tenantId,
+        userId: input.userId,
         username: input.username,
         avatar: input.avatar,
       },
-      update: { avatar: input.avatar, lastSeenAt: new Date() },
+      update: { username: input.username, avatar: input.avatar, lastSeenAt: new Date() },
       select: { id: true },
     });
     return player.id;
@@ -459,18 +473,54 @@ export class LiveSessionRepository implements LiveSessionStore {
     }));
   }
 
-  async getPlayers(sessionId: string): Promise<PlayerSnapshot[]> {
+  async getPlayers(sessionId: string): Promise<(PlayerSnapshot & { userId: string | null })[]> {
     const rows = await prisma.livePlayer.findMany({
       where: { sessionId },
       orderBy: { joinedAt: "asc" },
-      select: { id: true, username: true, avatar: true, score: true },
+      select: { id: true, userId: true, username: true, avatar: true, score: true },
     });
     return rows.map((row) => ({
       playerId: row.id,
+      userId: row.userId,
       username: row.username,
       avatar: row.avatar,
       score: row.score,
       connected: false,
     }));
+  }
+
+  async getResultsForUser(userId: string, _tenantId: string | null) {
+    const rows = await prisma.livePlayer.findMany({
+      where: { userId },
+      orderBy: { joinedAt: "desc" },
+      include: {
+        session: {
+          select: {
+            id: true,
+            status: true,
+            finishedAt: true,
+            quiz: { select: { title: true } },
+          },
+        },
+        answers: {
+          select: { isCorrect: true, score: true },
+        },
+      },
+    });
+    return rows.map((row) => {
+      const totalAnswers = row.answers.length;
+      const correctCount = row.answers.filter((a) => a.isCorrect).length;
+      const accuracyRate = totalAnswers > 0 ? Math.round((correctCount / totalAnswers) * 100) : 0;
+      return {
+        sessionId: row.session.id,
+        quizTitle: row.session.quiz.title,
+        status: row.session.status,
+        score: row.score,
+        answers: totalAnswers,
+        correctCount,
+        accuracyRate,
+        finishedAt: row.session.finishedAt?.toISOString() ?? null,
+      };
+    });
   }
 }

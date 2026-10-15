@@ -36,6 +36,7 @@ interface NavSection {
 const ROLE_LABEL: Record<UserRole, string> = {
   SUPERADMIN: "Superadmin",
   ADMIN: "Administrador",
+  EMPLOYEE: "Colaborador",
 };
 
 function buildNavigation(role: UserRole | undefined): NavSection[] {
@@ -46,7 +47,7 @@ function buildNavigation(role: UserRole | undefined): NavSection[] {
 
   const sections: NavSection[] = [{ title: "General", items: general }];
 
-  if (role) {
+  if (role === "ADMIN" || role === "SUPERADMIN") {
     sections.push({
       title: "Operación",
       items: [

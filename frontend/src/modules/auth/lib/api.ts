@@ -2,7 +2,7 @@ import { env } from "@/lib/env";
 import { ApiError, authHeader, noteUnauthorized } from "@/services/api-client";
 import { setToken } from "./auth-store";
 
-export type UserRole = "SUPERADMIN" | "ADMIN";
+export type UserRole = "SUPERADMIN" | "ADMIN" | "EMPLOYEE";
 
 export interface AuthUser {
   id: string;

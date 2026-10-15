@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getSocket } from "@/services/socket";
+import { useAuth } from "@/modules/auth/context/AuthContext";
+import { getToken } from "@/modules/auth/lib/auth-store";
 import { LiveBackground } from "../components/LiveBackground";
 import { SoundControls } from "../components/SoundControls";
 import { AVATARS, DEFAULT_AVATAR_ID } from "../lib/avatars";
@@ -16,10 +18,11 @@ import { playerStore } from "../lib/storage";
  * route carrying that id (persisted for reconnect on refresh).
  */
 export function JoinPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [pin, setPin] = useState(params.get("pin") ?? "");
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(() => user?.name.slice(0, 24) ?? "");
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR_ID);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,7 +38,7 @@ export function JoinPage() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || !user) return;
     setBusy(true);
     setError(null);
 
@@ -58,7 +61,7 @@ export function JoinPage() {
         socket.on(ServerEvents.playerJoinedAck, onJoined);
         socket.on(ServerEvents.error, onError);
         socket.on(ServerEvents.playerError, onError);
-        socket.emit(ClientEvents.playerJoin, { pin, username: username.trim(), avatar });
+        socket.emit(ClientEvents.playerJoin, { pin, username: username.trim(), avatar, token: getToken() });
         setTimeout(() => {
           cleanup();
           reject(new Error("El servidor no respondió. Inténtalo de nuevo."));
@@ -67,6 +70,7 @@ export function JoinPage() {
 
       playerStore.save({
         playerId: ack.playerId,
+        userId: user.id,
         sessionId: ack.sessionId,
         pin,
         username: ack.username,
@@ -94,7 +98,7 @@ export function JoinPage() {
         <form onSubmit={submit} className="game-panel slide-up w-full max-w-md space-y-5 rounded-3xl p-6 sm:p-8">
           <header className="text-center">
             <h1 className="text-3xl font-black text-ink">Unirse a la sesión</h1>
-            <p className="mt-1 text-sm text-ink-muted">Introduce el PIN y tu nombre para empezar.</p>
+            <p className="mt-1 text-sm text-ink-muted">Entras con tu cuenta; introduce el PIN para que tu progreso quede asociado a ella.</p>
           </header>
 
           <label className="block">

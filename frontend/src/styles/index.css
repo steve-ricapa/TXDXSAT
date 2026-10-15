@@ -129,6 +129,23 @@ body {
 }
 
 /* Public landing: content sits directly on the background, without card stacks. */
+.landing-page {
+  --landing-sky: #74c6ff;
+  --landing-violet: #b5a4ff;
+  --landing-amber: #ffd58a;
+}
+.landing-footer {
+  background: radial-gradient(680px 360px at 5% 0%, rgba(116, 198, 255, 0.09), transparent 70%), var(--color-surface);
+}
+.landing-footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-accent), var(--landing-sky), transparent);
+}
 .landing-grid {
   background-image:
     linear-gradient(to right, rgba(38, 59, 85, 0.22) 1px, transparent 1px),
@@ -136,9 +153,131 @@ body {
   background-size: 72px 72px;
 }
 
+/* Illustrative landing diagrams share the same geometric language and pause off-screen. */
+.landing-visual {
+  min-width: 0;
+  --landing-play: paused;
+}
+.landing-visual[data-active="true"] { --landing-play: running; }
+.landing-demo-label { text-align: right; letter-spacing: normal; text-transform: none; }
+.landing-hero-visual::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border: 1px dashed rgba(116, 198, 255, 0.37);
+  pointer-events: none;
+  animation: landing-breathe 5s ease-in-out infinite;
+  animation-play-state: paused;
+}
+.landing-hero-visual[data-active="true"]::after { animation-play-state: running; }
+.landing-chain-stage { overflow: hidden; }
+.landing-chain-stage svg { display: block; min-height: 170px; }
+.landing-chain-node { color: var(--color-accent); filter: drop-shadow(0 0 5px rgba(0, 199, 190, 0.45)); }
+.landing-chain-node-0, .landing-chain-node-4 { color: var(--landing-sky); }
+.landing-chain-link { fill: none; stroke: var(--color-border); stroke-width: 3; }
+.landing-chain-signal { fill: none; stroke: var(--landing-sky); stroke-width: 4; stroke-dasharray: 14 550; filter: drop-shadow(0 0 5px var(--landing-sky)); animation: landing-signal 2.8s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-break { opacity: 0; animation: landing-break 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-alert { fill: none; stroke: #ef6666; stroke-width: 3; stroke-dasharray: 12 280; filter: drop-shadow(0 0 4px rgba(239, 102, 102, 0.55)); animation: landing-alert 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-node-2 { animation: landing-node-state 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-mail { opacity: 0; animation: landing-mail 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-training { opacity: 0; animation: landing-training 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-shield { opacity: 0; animation: landing-shield 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-caption { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.landing-chain-caption span { animation: landing-caption 16s linear infinite; animation-play-state: var(--landing-play); }
+.landing-chain-caption span:nth-child(2) { animation-delay: -5.3s; }
+.landing-chain-caption span:nth-child(3) { animation-delay: -10.6s; }
+.landing-cycle-icon { --cycle-tone: var(--color-accent); color: var(--cycle-tone); animation: landing-cycle-focus 8s ease-in-out infinite; animation-delay: calc(var(--step) * -2s); animation-play-state: var(--landing-play); }
+.landing-cycle-step:nth-child(2) .landing-cycle-icon { --cycle-tone: var(--landing-sky); }
+.landing-cycle-step:nth-child(3) .landing-cycle-icon { --cycle-tone: var(--landing-violet); }
+.landing-cycle-step:nth-child(4) .landing-cycle-icon { --cycle-tone: var(--landing-amber); }
+.landing-cycle-step:nth-child(2) > span:not(.landing-cycle-connector) { color: var(--landing-sky); }
+.landing-cycle-step:nth-child(3) > span:not(.landing-cycle-connector) { color: var(--landing-violet); }
+.landing-cycle-step:nth-child(4) > span:not(.landing-cycle-connector) { color: var(--landing-amber); }
+.landing-cycle-connector { position: absolute; top: 18px; left: 72px; color: var(--color-accent); animation: landing-breathe 2s ease-in-out infinite; animation-delay: calc(var(--step) * -0.5s); animation-play-state: var(--landing-play); }
+.landing-mode-step { animation: landing-mode-focus 6s linear infinite; animation-delay: calc(var(--step) * -1.5s); animation-play-state: var(--landing-play); }
+.landing-modes > div:nth-child(2) .landing-mode-icon, .landing-modes > div:nth-child(2) .landing-mode-track > span > span { color: var(--landing-sky); }
+.landing-modes > div:nth-child(3) .landing-mode-icon, .landing-modes > div:nth-child(3) .landing-mode-track > span > span { color: var(--landing-violet); }
+.landing-department-bar { background: var(--landing-sky); }
+.landing-topic:nth-child(2) { border-color: rgba(181, 164, 255, 0.48); }
+.landing-topic:nth-child(3) { border-color: rgba(255, 213, 138, 0.48); }
+.landing-mail-signal { animation: landing-mail-hint 3.6s ease-in-out infinite; animation-play-state: var(--landing-play); }
+.landing-bar { position: relative; overflow: hidden; transition: width 2.4s ease-in-out, opacity 1s ease; }
+.landing-bar::after { content: ""; position: absolute; inset: 0; background: rgba(243, 247, 252, 0.18); transform: translateX(-100%); animation: landing-bar-scan 3.2s ease-in-out infinite; animation-play-state: var(--landing-play); }
+.landing-metric { transition: color 1s ease; }
+@keyframes landing-bar-scan { to { transform: translateX(100%); } }
+@keyframes landing-signal { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -564; } }
+@keyframes landing-node-state { 0%, 22%, 76%, 100% { color: var(--color-accent); } 28%, 62% { color: #ef6666; } }
+@keyframes landing-mail { 0%, 23%, 56%, 100% { opacity: 0; } 28%, 50% { opacity: 1; } }
+@keyframes landing-break { 0%, 35%, 68%, 100% { opacity: 0; } 40%, 62% { opacity: 1; } }
+@keyframes landing-alert { 0%, 35%, 67%, 100% { opacity: 0; stroke-dashoffset: 0; } 40% { opacity: 1; stroke-dashoffset: 0; } 62% { opacity: 1; stroke-dashoffset: -280; } }
+@keyframes landing-training { 0%, 55%, 80%, 100% { opacity: 0; } 62%, 73% { opacity: 1; } }
+@keyframes landing-shield { 0%, 67% { opacity: 0; } 76%, 94% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes landing-caption { 0%, 5%, 30%, 100% { color: var(--color-text-secondary); } 9%, 24% { color: var(--color-text-primary); } }
+@keyframes landing-cycle-focus { 0%, 19%, 100% { border-color: var(--color-border); background: transparent; box-shadow: none; } 3%, 14% { border-color: var(--cycle-tone); background: rgba(116, 198, 255, 0.08); box-shadow: 0 0 18px color-mix(in srgb, var(--cycle-tone) 40%, transparent); } }
+@keyframes landing-mode-focus { 0%, 20%, 100% { color: var(--color-text-secondary); } 3%, 16% { color: var(--color-accent); } }
+@keyframes landing-mail-hint { 0%, 100% { text-decoration-color: var(--color-border); } 50% { text-decoration-color: var(--color-accent); } }
+@keyframes landing-breathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.85; } }
+@media (max-width: 640px) {
+  .landing-chain-caption { grid-template-columns: 1fr; }
+  .landing-chain-caption span { animation: none; }
+  .landing-cycle-connector { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-visual *, .landing-visual *::before, .landing-hero-visual::after { animation: none !important; transition-duration: 0.01ms !important; }
+  .landing-chain-mail { opacity: 0; }
+  .landing-chain-break, .landing-chain-alert, .landing-chain-training { opacity: 0; }
+  .landing-chain-shield { opacity: 1; }
+}
+
+.landing-mark-halo {
+  position: absolute;
+  width: min(100%, 310px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(0, 199, 190, 0.24);
+  border-radius: 50%;
+  box-shadow: 0 0 65px rgba(116, 198, 255, 0.13), inset 0 0 55px rgba(0, 199, 190, 0.1);
+}
+
+.landing-section-heading h2::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 2px;
+  margin-top: 24px;
+  background: var(--color-accent);
+}
+
+.landing-capability { position: relative; }
+.landing-capability::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 72px;
+  height: 1px;
+  background: var(--color-accent);
+}
+
+.landing-journey-step { position: relative; }
+.landing-journey-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 58px;
+  bottom: -25px;
+  left: 7px;
+  width: 1px;
+  background: var(--color-accent);
+  opacity: 0.5;
+}
+
 @keyframes landing-enter {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes landing-halo-enter {
+  from { opacity: 0; transform: scale(0.82); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -146,6 +285,7 @@ body {
   .landing-delay-1 { animation-delay: 100ms; }
   .landing-delay-2 { animation-delay: 200ms; }
   .landing-delay-3 { animation-delay: 300ms; }
+  .landing-mark-halo { animation: landing-halo-enter 0.95s 0.35s ease-out both; }
 
   .landing-animated .landing-reveal {
     opacity: 0;
@@ -156,6 +296,29 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+
+  .landing-animated .landing-section-heading h2::after,
+  .landing-animated .landing-capability::before {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.7s 0.2s ease-out;
+  }
+  .landing-animated .landing-section-heading.is-visible h2::after,
+  .landing-animated .landing-capability.is-visible::before { transform: scaleX(1); }
+
+  .landing-animated .landing-journey-step {
+    opacity: 0.4;
+    transition: opacity 0.45s ease-out;
+    transition-delay: calc(0.2s + var(--step) * 0.38s);
+  }
+  .landing-animated .landing-journey.is-visible .landing-journey-step { opacity: 1; }
+  .landing-animated .landing-journey-step::before {
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 0.55s ease-out;
+    transition-delay: calc(0.3s + var(--step) * 0.38s);
+  }
+  .landing-animated .landing-journey.is-visible .landing-journey-step::before { transform: scaleY(1); }
 }
 
 /* ---------------------------------------------------------------------------

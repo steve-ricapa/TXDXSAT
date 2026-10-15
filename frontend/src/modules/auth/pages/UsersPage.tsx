@@ -28,6 +28,7 @@ import { useAuth } from "../context/AuthContext";
 const ROLE_LABEL: Record<UserRole, string> = {
   SUPERADMIN: "Superadmin",
   ADMIN: "Administrador",
+  EMPLOYEE: "Colaborador",
 };
 
 function formatDate(value: string | null): string {
@@ -49,6 +50,7 @@ export function UsersPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("ADMIN");
+  const [tenantId, setTenantId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AuthUser | null>(null);
@@ -75,11 +77,12 @@ export function UsersPage() {
     setCreating(true);
     setCreateError(null);
     try {
-      await authApi.createUser({ name: name.trim(), email: email.trim(), password, role });
+      await authApi.createUser({ name: name.trim(), email: email.trim(), password, role, tenantId: tenantId.trim() || null });
       setName("");
       setEmail("");
       setPassword("");
       setRole("ADMIN");
+      setTenantId("");
       await load();
     } catch (err) {
       setCreateError(err instanceof ApiError ? err.message : "No se pudo crear el usuario");
@@ -113,9 +116,9 @@ export function UsersPage() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-ink">Usuarios administradores</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink">Cuentas de la plataforma</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Todas las cuentas son administradores. Solo un superadmin puede crearlas.
+            Solo un superadmin puede crear cuentas. Los colaboradores necesitan el ID de su organización.
           </p>
         </div>
         <Badge variant="accent">{users.length} cuentas</Badge>
@@ -125,7 +128,7 @@ export function UsersPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-accent" />
-            <CardTitle>Crear administrador</CardTitle>
+            <CardTitle>Crear cuenta</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -167,8 +170,12 @@ export function UsersPage() {
                 onChange={(event) => setRole(event.target.value as UserRole)}
               >
                 <option value="ADMIN">Administrador</option>
+                <option value="EMPLOYEE">Colaborador</option>
                 <option value="SUPERADMIN">Superadmin</option>
               </Select>
+            </Field>
+            <Field label="ID de organización" htmlFor="new-tenant" hint={role === "EMPLOYEE" ? "Obligatorio para colaboradores (UUID)." : "Opcional para cuentas administrativas."}>
+              <Input id="new-tenant" value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder="UUID de la organización" required={role === "EMPLOYEE"} />
             </Field>
 
             {createError && (

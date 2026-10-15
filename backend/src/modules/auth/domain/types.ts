@@ -2,14 +2,15 @@
  * Auth module domain types.
  *
  * There is deliberately **no self-registration**: every account is provisioned
- * by a SUPERADMIN. The only two roles are:
+ * by a SUPERADMIN. Roles are:
  *   * `SUPERADMIN` — platform operator; may create/manage every account.
  *   * `ADMIN`      — company administrator (optionally bound to a tenant).
+ *   * `EMPLOYEE`   — company participant, always bound to a tenant.
  *
  * Nothing here knows about Prisma, Express or bcrypt.
  */
 
-export const USER_ROLES = ["SUPERADMIN", "ADMIN"] as const;
+export const USER_ROLES = ["SUPERADMIN", "ADMIN", "EMPLOYEE"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export function isUserRole(value: unknown): value is UserRole {
