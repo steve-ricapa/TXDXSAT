@@ -14,6 +14,17 @@ Despliegue público previsto: `https://txdxsecure.com/sat`.
 > QR, puntuación autoritativa en servidor, persistencia en PostgreSQL y publicación del
 > evento de dominio `live_session.finished.v1` vía outbox. Ver
 > [`docs/quizz-integration.md`](docs/quizz-integration.md).
+>
+> **Fase 3 — Experiencia tipo concurso, imágenes y almacenamiento local.** Rediseño
+> visual del presentador/jugador (colores y formas de concurso, animaciones, audio,
+> lobby, ranking y podio), **editor de preguntas con imágenes** y **almacenamiento local
+> persistente** en un volumen Docker (sin S3). Ver
+> [`docs/storage.md`](docs/storage.md) y
+> [`docs/quizz-integration.md`](docs/quizz-integration.md).
+>
+> **Autenticación — solo login (sin registro).** Dos roles, `SUPERADMIN` y `ADMIN`; todas
+> las cuentas las crea un superadmin. Sesiones opacas de servidor. Ver
+> [`docs/auth.md`](docs/auth.md).
 
 ---
 
@@ -58,7 +69,9 @@ TXDXSAT/
 ├── infrastructure/docker/    # Reservado para artefactos de infraestructura
 ├── docs/
 │   ├── architecture.md       # Arquitectura base (Fase 1)
-│   └── quizz-integration.md  # Integración del motor de juego (Fase 2)
+│   ├── quizz-integration.md  # Integración del motor de juego (Fase 2 y 3)
+│   ├── storage.md            # Almacenamiento local de imágenes (Fase 3)
+│   └── auth.md               # Autenticación y usuarios (login, sin registro)
 ├── compose.yaml              # Producción (3 contenedores)
 ├── compose.dev.yaml          # Desarrollo con hot reload
 └── .env.example
@@ -70,6 +83,13 @@ El módulo de sesiones en vivo vive en:
   (`domain` · `application` · `infrastructure` · `presentation`).
 - Frontend: `frontend/src/modules/live-sessions/`
   (`lib` · `hooks` · `components` · `pages`).
+
+Otros módulos:
+
+- **Autenticación** (`backend/src/modules/auth/`, `frontend/src/modules/auth/`):
+  login, sesiones opacas y gestión de usuarios.
+- **Medios** (`backend/src/modules/media/`): puerto `FileStorage` +
+  `LocalFileStorage`, subida/lectura/borrado de imágenes.
 
 ---
 
@@ -108,6 +128,11 @@ sus variables con Zod al arrancar y falla rápido si falta `DATABASE_URL`.
 | `DISPATCHER_MAX_ATTEMPTS` | Reintentos antes del estado terminal `FAILED` | `10` |
 | `DISPATCHER_LEASE_MS` | Vigencia del arriendo de un mensaje (ms) | `30000` |
 | `RUN_MIGRATIONS` | Ejecuta `prisma migrate deploy` al arrancar el contenedor | `true` |
+| `STORAGE_DRIVER` | Adaptador de almacenamiento de imágenes (`local`) | `local` |
+| `STORAGE_DIR` | Directorio de almacenamiento (debe ser el volumen `txdxsat_uploads`) | `/app/storage` |
+| `STORAGE_MAX_BYTES` | Tamaño máximo por imagen, en bytes | `5242880` (5 MB) |
+| `SESSION_TTL_HOURS` | Caducidad de las sesiones de login (horas) | `720` |
+| `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` / `SUPERADMIN_NAME` | Superadmin inicial (solo se crea si no hay cuentas) | — |
 | `VITE_BASE_PATH` | Prefijo público de despliegue | `/sat/` |
 
 > ⚠️ No se guardan credenciales en el repositorio: `.env` está ignorado por Git.
@@ -190,38 +215,86 @@ En Docker, el `ENTRYPOINT` del backend ejecuta `prisma migrate deploy` antes de 
 
 ---
 
-## Sesiones en vivo (Fase 2)
+## Autenticación (login, sin registro)
 
-Rutas públicas (SPA a pantalla completa, servidas por Nginx bajo `/sat`):
+La plataforma es **solo login**: no hay registro público. Todas las cuentas las
+crea un **SUPERADMIN**; los usuarios creados son **ADMIN**. El primer superadmin
+se crea automáticamente al arrancar si no existe ninguna cuenta
+(`SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` / `SUPERADMIN_NAME`), o manualmente:
 
-| Ruta | Pantalla |
+```bash
+cd backend
+npm run seed:superadmin
+```
+
+| Ruta | Acceso |
 |---|---|
-| `/sat/live/join` | Jugador: introduce PIN y nombre |
-| `/sat/live/play/:sessionId` | Jugador durante la partida |
-| `/sat/live/host/:sessionId` | Host: consola de control |
-| `/sat/live/present/:sessionId` | Presentador (solo lectura, `viewToken`) |
+| `/sat/login` | Público |
+| `/sat/admin`, `/sat/live/host/:id`, `/sat/live/editor` | Requiere sesión |
+| `/sat/superadmin`, `/sat/account` | Requiere sesión (superadmin / cuenta) |
+| `/sat/live/join`, `/sat/live/play/:id`, `/sat/live/present/:id` | Público (PIN/token) |
 
-API REST bajo `/sat/api/v1/live` (`quizzes`, `sessions`, `sessions/:id/results`).
-El handshake de Socket.IO se sirve en `/sat/socket.io` (proxy Nginx con upgrade de
-WebSocket).
+El token de sesión (opaco, tipo portador) se envía como `Authorization: Bearer`.
+El detalle del modelo, roles, endpoints y CORS está en
+[`docs/auth.md`](docs/auth.md).
+
+> ⚠️ Cambia `SUPERADMIN_PASSWORD` (y `POSTGRES_PASSWORD`) antes de exponer el
+> servicio.
+
+---
+
+## Sesiones en vivo (Fase 2 y 3)
+
+Rutas SPA (a pantalla completa, servidas por Nginx bajo `/sat`):
+
+| Ruta | Pantalla | Acceso |
+|---|---|---|
+| `/sat/live/join` | Jugador: introduce PIN y nombre | Público |
+| `/sat/live/play/:sessionId` | Jugador durante la partida | Público |
+| `/sat/live/present/:sessionId` | Presentador (solo lectura, `viewToken`) | Público |
+| `/sat/live/host/:sessionId` | Host: consola de control | Sesión |
+| `/sat/live/editor` | Editor de quizzes con imágenes | Sesión |
+
+API REST bajo `/sat/api/v1/live` (`quizzes`, `sessions`, `sessions/:id/results`)
+y `/sat/api/v1/media` (subida/lectura/borrado de imágenes). El handshake de
+Socket.IO se sirve en `/sat/socket.io` (proxy Nginx con upgrade de WebSocket).
 
 ### Scripts de operación
+
+Los scripts de autoría/medios requieren sesión: toman las credenciales de
+`SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` (o de `TXDXSAT_TOKEN`).
 
 ```bash
 cd backend
 
-# 1. Cargar el quiz de demostración de ciberseguridad (10 preguntas)
+# 0. Autenticación: prueba de login, roles, endpoints y CORS (40 checks)
+node scripts/smoke-auth.mjs http://localhost:8080/sat/api/v1
+
+# 1. Cargar el quiz de demostración de ciberseguridad
 node scripts/seed-demo-quiz.mjs http://localhost:8080/sat/api/v1
 
-# 2. Prueba de humo end-to-end por Socket.IO real
+# 2. Demo de phishing con imagen (sube la imagen y crea el quiz)
+node scripts/seed-phishing-demo.mjs http://localhost:8080/sat/api/v1
+
+# 3. Medios: subida, lectura, aislamiento entre tenants y borrado (14 checks)
+node scripts/smoke-media.mjs http://localhost:8080/sat/api/v1
+
+# 4. Prueba de humo end-to-end por Socket.IO real
 node scripts/smoke-live.mjs http://localhost:8080/sat/api/v1 http://localhost:8080
 
-# 3. Test de carga (jugadores por sesión)
+# 5. Test de carga (jugadores por sesión)
 node scripts/load-test.mjs http://localhost:8080/sat/api/v1 http://localhost:8080 /sat/socket.io 20,50,100
 ```
 
 > En Git Bash de Windows usa `MSYS_NO_PATHCONV=1` para evitar que la ruta
 > `/sat/socket.io` se convierta en una ruta de Windows.
+
+### Almacenamiento de imágenes (Fase 3)
+
+Las imágenes se guardan en el volumen Docker **`txdxsat_uploads`** (montado en
+`/app/storage`), fuera de directorios públicos, y se sirven por endpoints
+controlados con *capability URLs* (UUID). Persisten a reinicios, reconstrucciones
+y `docker compose down` (sin `-v`). Detalle en [`docs/storage.md`](docs/storage.md).
 
 ---
 
@@ -246,8 +319,9 @@ curl http://localhost:8080/sat/api/v1/system/outbox
 ```
 
 Prueba de humo del motor en vivo y test de carga: ver
-[**Sesiones en vivo (Fase 2)**](#sesiones-en-vivo-fase-2). El detalle de lo
-verificado y lo pendiente está en `docs/quizz-integration.md`.
+[**Sesiones en vivo (Fase 2 y 3)**](#sesiones-en-vivo-fase-2-y-3). El detalle de
+lo verificado y lo pendiente está en `docs/quizz-integration.md`,
+`docs/storage.md` y `docs/auth.md`.
 
 ---
 

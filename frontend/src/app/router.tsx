@@ -4,6 +4,9 @@ import { HomePage } from "./HomePage";
 import { EmployeeHome } from "@/modules/employee/pages/EmployeeHome";
 import { AdminHome } from "@/modules/enterprise-admin/pages/AdminHome";
 import { SuperAdminHome } from "@/modules/superadmin/pages/SuperAdminHome";
+import { LoginPage } from "@/modules/auth/pages/LoginPage";
+import { AccountPage } from "@/modules/auth/pages/AccountPage";
+import { ProtectedRoute } from "@/modules/auth/components/ProtectedRoute";
 import { JoinPage } from "@/modules/live-sessions/pages/JoinPage";
 import { PlayPage } from "@/modules/live-sessions/pages/PlayPage";
 import { HostPage } from "@/modules/live-sessions/pages/HostPage";
@@ -28,18 +31,57 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <HomePage /> },
         { path: "employee", element: <EmployeeHome /> },
-        { path: "admin", element: <AdminHome /> },
-        { path: "superadmin", element: <SuperAdminHome /> },
+        {
+          path: "admin",
+          element: (
+            <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
+              <AdminHome />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "superadmin",
+          element: (
+            <ProtectedRoute roles={["SUPERADMIN"]}>
+              <SuperAdminHome />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "account",
+          element: (
+            <ProtectedRoute>
+              <AccountPage />
+            </ProtectedRoute>
+          ),
+        },
         { path: "*", element: <NotFoundPage /> },
       ],
     },
-    // Live sessions render full-screen, outside the corporate shell.
+    // Login renders full-screen, outside the corporate shell.
+    { path: "login", element: <LoginPage /> },
+    // Live sessions render full-screen. Joining/playing/presenting is public
+    // (PIN/token based); hosting and authoring require a session.
     { path: "live/join", element: <JoinPage /> },
     { path: "live/play/:sessionId", element: <PlayPage /> },
+    {
+      path: "live/host",
+      element: (
+        <ProtectedRoute>
+          <HostPage />
+        </ProtectedRoute>
+      ),
+    },
     { path: "live/host/:sessionId", element: <HostPage /> },
-    { path: "live/host", element: <HostPage /> },
     { path: "live/present/:sessionId", element: <PresentPage /> },
-    { path: "live/editor", element: <QuizEditorPage /> },
+    {
+      path: "live/editor",
+      element: (
+        <ProtectedRoute>
+          <QuizEditorPage />
+        </ProtectedRoute>
+      ),
+    },
   ],
   { basename: resolveBasename(import.meta.env.BASE_URL) },
 );

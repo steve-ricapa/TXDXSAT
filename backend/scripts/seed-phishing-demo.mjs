@@ -16,6 +16,7 @@
  */
 
 import { renderPhishingEmail } from "./lib/png.mjs";
+import { bearer, getToken } from "./lib/auth.mjs";
 
 const baseUrl = (
   process.argv[2] ??
@@ -23,13 +24,17 @@ const baseUrl = (
   "http://localhost:8080/sat/api/v1"
 ).replace(/\/$/, "");
 
-async function uploadDemoImage() {
+async function uploadDemoImage(token) {
   const png = renderPhishingEmail();
   const form = new FormData();
   form.append("file", new Blob([png], { type: "image/png" }), "phishing-demo.png");
   form.append("purpose", "QUESTION");
 
-  const response = await fetch(`${baseUrl}/media`, { method: "POST", body: form });
+  const response = await fetch(`${baseUrl}/media`, {
+    method: "POST",
+    headers: bearer(token),
+    body: form,
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(`Image upload failed (${response.status}): ${JSON.stringify(body)}`);
@@ -88,8 +93,9 @@ function buildQuestions(imageUrl) {
 }
 
 async function main() {
+  const token = await getToken(baseUrl);
   console.log(`Generating phishing demo image...`);
-  const { png, asset } = await uploadDemoImage();
+  const { png, asset } = await uploadDemoImage(token);
   console.log(
     `Uploaded image ${asset.id} (${asset.width}x${asset.height}, ${asset.size} bytes) -> ${asset.url}`,
   );
@@ -104,7 +110,7 @@ async function main() {
 
   const response = await fetch(`${baseUrl}/live/quizzes`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...bearer(token) },
     body: JSON.stringify(payload),
   });
   const body = await response.json().catch(() => ({}));

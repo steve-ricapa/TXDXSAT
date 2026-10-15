@@ -13,6 +13,7 @@ import { createApp } from "./app/app.ts";
 import type { AppDependencies } from "./app/dependencies.ts";
 import { createRealtimeServer } from "./realtime/socket.ts";
 import { createLiveSessionModule } from "./modules/live-sessions/live-sessions.module.ts";
+import { ensureSuperadmin } from "./modules/auth/infrastructure/bootstrap.ts";
 
 /**
  * Composition root.
@@ -29,6 +30,10 @@ async function bootstrap(): Promise<void> {
 
   await connectDatabase();
   logger.info("database connection established");
+
+  // --- Auth bootstrap ------------------------------------------------------
+  // Create the first superadmin from env while the platform has no accounts.
+  await ensureSuperadmin(logger);
 
   // --- Event infrastructure ------------------------------------------------
   const bus = new EventBus();

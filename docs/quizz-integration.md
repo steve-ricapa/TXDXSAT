@@ -441,3 +441,101 @@ con 100. Todos por debajo del plazo de pregunta configurable (30 s en el test).
 
 **Infra**: `compose.yaml`, `compose.dev.yaml`, `frontend/nginx.conf` (proxy
 `/sat/api` y `/sat/socket.io` con upgrade de WebSocket).
+
+---
+
+## 14. Fase 3 — Experiencia de concurso, imágenes y almacenamiento local
+
+La Fase 3 **no cambia** el motor ni el protocolo de la Fase 2: los cinco tipos de
+pregunta, la puntuación autoritativa, el orden de guardas y la sincronización por
+Socket.IO se conservan intactos. Lo que se añade es la capa visual tipo concurso,
+el editor de preguntas con imágenes y el almacenamiento persistente de medios.
+
+### 14.1 Rediseño visual (estilo concurso, no dashboard)
+
+- Paleta y formas de respuesta: **rojo `#E21B3C`**, **azul `#1368CE`**,
+  **amarillo `#D89E00`**, **verde `#26890C`**, cada una con su figura geométrica
+  (triángulo, rombo, círculo, cuadrado) — ver
+  `frontend/src/modules/live-sessions/lib/answer-style.ts` y `AnswerShape.tsx`.
+- **Presentador** (`/live/present/:sessionId`): cabecera con número de pregunta y
+  enunciado grande; centro con imagen principal (si la hay), anillo de tiempo
+  animado y contador de respuestas; abajo, cuatro tarjetas de respuesta grandes.
+  Si no hay imagen, el escenario **se reajusta** automáticamente. Optimizado para
+  1920×1080.
+- **Jugador** (*mobile-first*): PIN/QR → nombre → lobby → responder → confirmación
+  → puntos → posición final. Botones grandes, bloqueo visual tras responder, sin
+  scroll.
+- **Lobby** (`Lobby.tsx`), **ranking** intermensual (`Leaderboard.tsx`) y **podio**
+  final (`Podium.tsx`) con animaciones escalonadas, confeti y fanfarria.
+- **Audio** por Web Audio (`lib/sound.ts`): música de lobby/pregunta, cuenta atrás,
+  acierto/fallo, ranking y podio; controles de volumen/silencio
+  (`SoundControls.tsx`). No se usa música ni arte de Kahoot.
+
+Se eligió **CSS + componentes React** (sin librerías gráficas pesadas) para las
+animaciones, manteniendo el rendimiento en proyector.
+
+### 14.2 Editor de preguntas con imágenes
+
+`frontend/src/modules/live-sessions/pages/QuizEditorPage.tsx`, con
+`MediaUploader` y `MediaPicker`:
+
+- Enunciado, imagen principal opcional, 2–4 respuestas, imágenes por respuesta
+  opcionales, tiempo, puntos, respuesta correcta y explicación.
+- Subida por selección o *drag & drop*, vista previa, reemplazo y borrado, y
+  **reutilización** de imágenes ya subidas.
+- Formatos **JPG/PNG/WebP**, límite inicial **5 MB**, con **optimización en
+  cliente** (canvas) antes de subir.
+
+Backend: `POST/PUT /api/v1/live/quizzes/:id` (REST de autoría) y el módulo de
+medios (ver §14.3 y [`docs/storage.md`](storage.md)).
+
+### 14.3 Almacenamiento local persistente
+
+- Volumen Docker **`txdxsat_uploads`** montado en `/app/storage`; sobrevive a
+  reinicios, reconstrucciones de imagen, `docker compose down` (sin `-v`) y
+  actualizaciones de código.
+- Estructura `tenants/{tenantId}/{questions,answers,laboratories}` y
+  `shared/questions`.
+- Puerto desacoplado `FileStorage { upload, get, delete }`; implementación
+  **solo** `LocalFileStorage`. La migración a S3 sería únicamente un cambio de
+  adaptador.
+- La BD guarda solo metadatos (id, tenant, ruta, MIME, tamaño, dimensiones,
+  fecha); **nunca** binario ni Base64.
+- Seguridad: firma binaria, nombres UUID, prevención de *path traversal*, límite
+  de tamaño, autorización por tenant y borrado controlado.
+
+> El detalle completo (interfaz, API, seguridad, persistencia, migración a S3)
+> está en **[`docs/storage.md`](storage.md)**.
+
+### 14.4 Demo funcional (phishing)
+
+`scripts/seed-phishing-demo.mjs` sintetiza una captura ficticia de correo de
+phishing, la sube por la API de medios (queda en el volumen y en `media_assets`) y
+crea un quiz cuya primera pregunta —«¿Cuál de estos correos presenta señales de
+phishing?»— usa esa imagen, con la respuesta correcta n.º 2 («Es sospechoso por el
+dominio del remitente»). Permite verificar: subida desde el editor, persistencia
+en el volumen, referencia en PostgreSQL, imagen mostrada durante el juego,
+respuesta, puntuación y supervivencia a un reinicio del backend.
+
+### 14.5 Verificación (Fase 3)
+
+| Verificación | Método | Resultado |
+| --- | --- | --- |
+| Typecheck/build backend y frontend | `tsc --noEmit`, `npm run build`, `vite build` | Limpios |
+| Medios (subida/lectura/aislamiento/borrado) | `node scripts/smoke-media.mjs` | **14/14** |
+| Demo de phishing | `node scripts/seed-phishing-demo.mjs` | Imagen + quiz creados |
+| Motor en vivo intacto | `node scripts/smoke-live.mjs http://localhost:8080/sat/api/v1` | **ALL CHECKS PASSED** |
+| Carga (realtime) | `node scripts/load-test.mjs ... 20` | 0 errores, 20/20 |
+| Persistencia del volumen | reinicio + relectura | Ver `docs/storage.md` §4 |
+
+### 14.6 Autenticación (login, sin registro)
+
+La Fase 3 introduce además el **login de administración** (dos roles:
+`SUPERADMIN` y `ADMIN`; sin registro público). Los scripts de prueba y operación
+ahora se autentican. El detalle está en **[`docs/auth.md`](auth.md)**.
+
+Cambios relevantes para la integración del motor: los endpoints de **autoría**
+(`/live/quizzes`, `/media` salvo la lectura por *capability URL*) pasan a exigir
+sesión; el juego en vivo (join/play/present por PIN/token) y el endpoint de
+resultados por `viewToken`/`hostToken` siguen siendo públicos. El motor y el
+protocolo **no** se modificaron.

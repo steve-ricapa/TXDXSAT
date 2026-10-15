@@ -1,4 +1,4 @@
-import { ApiError } from "@/services/api-client";
+import { ApiError, authHeader, noteUnauthorized } from "@/services/api-client";
 import { env } from "@/lib/env";
 
 /**
@@ -104,6 +104,7 @@ export async function optimizeImage(file: File, options: OptimizeOptions = {}): 
 }
 
 async function parseError(response: Response): Promise<never> {
+  if (response.status === 401) noteUnauthorized(response.status);
   const text = await response.text().catch(() => "");
   let message = `Upload failed (${response.status})`;
   try {
@@ -129,7 +130,7 @@ export async function uploadMedia(blob: Blob, options: UploadMediaOptions = {}):
   if (options.purpose) form.append("purpose", options.purpose);
   form.append("tenantId", options.tenantId ?? "");
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = authHeader();
   if (options.tenantId) headers["x-tenant-id"] = options.tenantId;
 
   const response = await fetch(`${env.apiBaseUrl}/media`, {
@@ -156,7 +157,7 @@ export async function listMedia(
   const params = new URLSearchParams();
   if (purpose) params.set("purpose", purpose);
   const query = params.toString();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = authHeader();
   if (tenantId) headers["x-tenant-id"] = tenantId;
 
   const response = await fetch(`${env.apiBaseUrl}/media${query ? `?${query}` : ""}`, { headers });
@@ -167,7 +168,7 @@ export async function listMedia(
 
 /** Delete an asset within its tenant scope. */
 export async function deleteMedia(id: string, tenantId?: string | null): Promise<void> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = authHeader();
   if (tenantId) headers["x-tenant-id"] = tenantId;
   const response = await fetch(`${env.apiBaseUrl}/media/${id}`, { method: "DELETE", headers });
   if (!response.ok && response.status !== 204) await parseError(response);

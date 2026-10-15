@@ -14,6 +14,8 @@
  * backend.
  */
 
+import { bearer, getToken } from "./lib/auth.mjs";
+
 const baseUrl = (process.argv[2] ?? process.env.TXDXSAT_API ?? "http://localhost:8080/sat/api/v1").replace(
   /\/$/,
   "",
@@ -152,9 +154,10 @@ const payload = {
 async function main() {
   const url = `${baseUrl}/live/quizzes`;
   console.log(`Seeding demo quiz -> ${url}`);
+  const token = await getToken(baseUrl);
   const response = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...bearer(token) },
     body: JSON.stringify(payload),
   });
   const body = await response.json().catch(() => ({}));

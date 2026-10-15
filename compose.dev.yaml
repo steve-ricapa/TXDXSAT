@@ -53,6 +53,10 @@ services:
       RUN_MIGRATIONS: "true"
       STORAGE_DRIVER: local
       STORAGE_DIR: /app/storage
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-720}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@txdxsat.local}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-change-me-superadmin}
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
     volumes:
       # Hot reload: source and Prisma schema are mounted over the image copy.
       - ./backend/src:/app/src

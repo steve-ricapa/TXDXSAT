@@ -1,18 +1,36 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { env } from "@/lib/env";
+import { useAuth } from "@/modules/auth/context/AuthContext";
 
-const navigation = [
-  { to: "/", label: "Inicio", end: true },
-  { to: "/employee", label: "Empleado" },
-  { to: "/admin", label: "Administrador" },
-  { to: "/superadmin", label: "Superadmin" },
-];
+interface NavItem {
+  to: string;
+  label: string;
+  end?: boolean;
+}
 
 /**
- * Corporate application shell shared by the three portals. The live-session
- * module renders its own full-screen layouts outside this shell.
+ * Corporate application shell shared by the portals. The live-session module
+ * renders its own full-screen layouts outside this shell.
  */
 export function AppShell() {
+  const { user, status, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const navigation: NavItem[] = [{ to: "/", label: "Inicio", end: true }];
+  if (user) {
+    navigation.push({ to: "/admin", label: "Panel" });
+    navigation.push({ to: "/live/host", label: "Anfitrión" });
+    navigation.push({ to: "/live/editor", label: "Editor" });
+  }
+  if (user?.role === "SUPERADMIN") {
+    navigation.push({ to: "/superadmin", label: "Usuarios" });
+  }
+
+  async function onLogout() {
+    await logout();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="flex min-h-full flex-col">
       <header className="border-b border-black/5 bg-white/80 backdrop-blur">
@@ -39,9 +57,31 @@ export function AppShell() {
               </NavLink>
             ))}
           </nav>
-          <span className="hidden text-xs text-[var(--color-ink-muted)] sm:block">
-            {env.appName}
-          </span>
+
+          {status === "authenticated" && user ? (
+            <div className="flex items-center gap-3">
+              <NavLink
+                to="/account"
+                className="hidden text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] sm:block"
+              >
+                {user.name}
+              </NavLink>
+              <button
+                type="button"
+                onClick={() => void onLogout()}
+                className="rounded-lg border border-black/10 px-3 py-1.5 text-xs font-semibold hover:bg-black/5"
+              >
+                Salir
+              </button>
+            </div>
+          ) : (
+            <NavLink
+              to="/login"
+              className="rounded-lg bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-brand-700)]"
+            >
+              Iniciar sesión
+            </NavLink>
+          )}
         </div>
       </header>
 
@@ -50,7 +90,7 @@ export function AppShell() {
       </main>
 
       <footer className="border-t border-black/5 px-4 py-4 text-center text-xs text-[var(--color-ink-muted)]">
-        © {new Date().getFullYear()} TXDXSecure · TXDXSAT
+        © {new Date().getFullYear()} TXDXSecure · {env.appName}
       </footer>
     </div>
   );

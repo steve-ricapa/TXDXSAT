@@ -13,15 +13,19 @@
  * Usage: node scripts/smoke-live.mjs [apiBaseUrl] [socketUrl]
  */
 import { io } from "socket.io-client";
+import { bearer, getToken } from "./lib/auth.mjs";
 
 const apiBase = (process.argv[2] ?? "http://localhost:4100/api/v1").replace(/\/$/, "");
-const socketUrl = process.argv[3] ?? apiBase.replace(/\/api\/v1$/, "");
+// Socket.IO origin: the HTTP origin only. The deployment prefix (`/sat`) belongs
+// in `path`, not in the namespace, so it must be stripped here.
+const socketUrl = process.argv[3] ?? new URL(apiBase).origin;
 // Behind Nginx the Socket.IO handshake lives under the deployment prefix.
 const socketPath =
   process.argv[4] ?? (apiBase.includes("/sat") ? "/sat/socket.io" : "/socket.io");
 const socketOptions = { transports: ["websocket"], path: socketPath };
 
 let failures = 0;
+let TOKEN = null;
 function check(name, condition, detail = "") {
   if (condition) {
     console.log(`  ok   ${name}`);
@@ -50,7 +54,7 @@ function once(socket, event, { timeout = 15_000, filter = () => true } = {}) {
 async function post(path, body, headers = {}) {
   const res = await fetch(`${apiBase}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json", ...headers },
+    headers: { "content-type": "application/json", ...bearer(TOKEN), ...headers },
     body: JSON.stringify(body ?? {}),
   });
   const json = await res.json().catch(() => ({}));
@@ -59,7 +63,7 @@ async function post(path, body, headers = {}) {
 }
 
 async function get(path, headers = {}) {
-  const res = await fetch(`${apiBase}${path}`, { headers });
+  const res = await fetch(`${apiBase}${path}`, { headers: { ...bearer(TOKEN), ...headers } });
   const json = await res.json().catch(() => ({}));
   return { status: res.status, json };
 }
@@ -116,6 +120,7 @@ function correctAnswer(question, broadcast) {
 
 async function main() {
   console.log("== live-session smoke test ==");
+  TOKEN = await getToken(apiBase);
   const createdQuiz = await post("/live/quizzes", quiz);
   const session = await post("/live/sessions", { quizId: createdQuiz.id });
   console.log(`  quiz=${createdQuiz.id} session=${session.sessionId} pin=${session.pin}`);

@@ -10,6 +10,33 @@ interface PrismaKnownError {
   meta?: Record<string, unknown>;
 }
 
+interface BodyParserError {
+  type: string;
+  status?: number;
+  statusCode?: number;
+  message?: string;
+}
+
+function asBodyParserError(error: unknown): BodyParserError | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "type" in error &&
+    typeof (error as { type: unknown }).type === "string"
+  ) {
+    const type = (error as { type: string }).type;
+    if (
+      type.startsWith("entity.") ||
+      type === "charset.unsupported" ||
+      type === "encoding.unsupported" ||
+      type === "request.aborted"
+    ) {
+      return error as BodyParserError;
+    }
+  }
+  return undefined;
+}
+
 function asPrismaKnownError(error: unknown): PrismaKnownError | undefined {
   if (
     typeof error === "object" &&
@@ -62,6 +89,22 @@ export function errorHandler(logger: Logger) {
           code: error.code,
           message: error.message,
           ...(error.details !== undefined ? { details: error.details } : {}),
+          requestId,
+        },
+      });
+      return;
+    }
+
+    // Body parsing failures (malformed JSON, oversized payload) are client
+    // errors, not internal ones.
+    const bodyError = asBodyParserError(error);
+    if (bodyError) {
+      const tooLarge = bodyError.type === "entity.too.large";
+      logger.warn({ bodyParserType: bodyError.type }, "rejected request body");
+      res.status(tooLarge ? 413 : 400).json({
+        error: {
+          code: ERROR_CODES.validation,
+          message: tooLarge ? "Request body is too large" : "Malformed request body",
           requestId,
         },
       });

@@ -1,7 +1,8 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { createHealthModule } from "../modules/health/health.module.ts";
 import { createSystemModule } from "../modules/system/system.module.ts";
 import { createMediaModule } from "../modules/media/media.module.ts";
+import { createAuthModule } from "../modules/auth/auth.module.ts";
 import { createLiveSessionModule } from "../modules/live-sessions/live-sessions.module.ts";
 import type { AppDependencies } from "./dependencies.ts";
 
@@ -10,6 +11,13 @@ import type { AppDependencies } from "./dependencies.ts";
  *
  * Adding a domain module means adding one `createXModule()` call here; modules
  * never import each other, which keeps the dependency graph acyclic.
+ *
+ * Guarding model:
+ *   * `/health`, `/system` and the auth `login` endpoint are public;
+ *   * everything else requires a valid session (Authorization: Bearer);
+ *   * scope exceptions are the capability-URL image read (`GET /media/:id`) and
+ *     the token-protected game results (`GET /live/sessions/:id/results`), which
+ *     are reached by participants/presenters that are not logged in.
  */
 export function createApiRouter(deps: AppDependencies): Router {
   const router = Router();
@@ -26,6 +34,8 @@ export function createApiRouter(deps: AppDependencies): Router {
     bus: deps.bus,
   });
 
+  const auth = createAuthModule({ logger: deps.logger });
+
   const live = createLiveSessionModule({
     logger: deps.logger,
     publisher: deps.publisher,
@@ -33,10 +43,46 @@ export function createApiRouter(deps: AppDependencies): Router {
 
   const media = createMediaModule({ logger: deps.logger });
 
+  const { requireAuth } = auth.middleware;
+
   router.use(health.router);
   router.use("/system", system.router);
-  router.use("/media", media.router);
-  router.use("/live", live.router);
+  router.use("/auth", auth.router);
+
+  // Images: the by-id read is an unguessable capability URL used inside <img>
+  // tags; listing, uploading and deleting are authoring operations.
+  router.use(
+    "/media",
+    publicWhen((req) => req.method === "GET" && req.path !== "/" && req.path !== "", requireAuth),
+    media.router,
+  );
+
+  // Live sessions: only the persisted results (guarded by the session token that
+  // participants already hold) stay public; quizzes and session creation are
+  // authoring operations.
+  router.use(
+    "/live",
+    publicWhen(
+      (req) => req.method === "GET" && /^\/sessions\/[^/]+\/results\/?$/.test(req.path),
+      requireAuth,
+    ),
+    live.router,
+  );
 
   return router;
+}
+
+/**
+ * Apply `guard` to every request except the ones matched by `isPublic`. The
+ * Express mount path is stripped before the check, so `req.path` is relative to
+ * the mount point.
+ */
+function publicWhen(
+  isPublic: (req: Request) => boolean,
+  guard: (req: Request, res: Response, next: NextFunction) => void,
+) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (isPublic(req)) return next();
+    guard(req, res, next);
+  };
 }

@@ -15,6 +15,7 @@
 
 import { randomUUID } from "node:crypto";
 import { renderPhishingEmail } from "./lib/png.mjs";
+import { bearer, getToken } from "./lib/auth.mjs";
 
 const baseUrl = (
   process.argv[2] ??
@@ -25,6 +26,7 @@ const origin = new URL(baseUrl).origin;
 
 let failures = 0;
 let checks = 0;
+let token = null;
 
 function check(name, condition, detail = "") {
   checks += 1;
@@ -47,7 +49,7 @@ async function upload(buffer, { type = "image/png", name = "test.png", tenantId,
   const form = new FormData();
   form.append("file", new Blob([buffer], { type }), name);
   if (purpose) form.append("purpose", purpose);
-  const headers = tenantId ? { "x-tenant-id": tenantId } : {};
+  const headers = { ...bearer(token), ...(tenantId ? { "x-tenant-id": tenantId } : {}) };
   const response = await fetch(`${baseUrl}/media`, { method: "POST", headers, body: form });
   const body = await response.json().catch(() => ({}));
   return { status: response.status, body };
@@ -55,6 +57,8 @@ async function upload(buffer, { type = "image/png", name = "test.png", tenantId,
 
 async function main() {
   console.log(`Media smoke test against ${baseUrl}\n`);
+
+  token = await getToken(baseUrl);
 
   const tenantA = randomUUID();
   const tenantB = randomUUID();
@@ -76,15 +80,15 @@ async function main() {
   check("read content-type", direct.headers.get("content-type") === "image/png", direct.headers.get("content-type") ?? "?");
 
   // 3. Listing is tenant-scoped.
-  const listA = await fetch(`${baseUrl}/media?purpose=QUESTION`, { headers: { "x-tenant-id": tenantA } }).then((r) => r.json());
-  const listB = await fetch(`${baseUrl}/media?purpose=QUESTION`, { headers: { "x-tenant-id": tenantB } }).then((r) => r.json());
+  const listA = await fetch(`${baseUrl}/media?purpose=QUESTION`, { headers: { ...bearer(token), "x-tenant-id": tenantA } }).then((r) => r.json());
+  const listB = await fetch(`${baseUrl}/media?purpose=QUESTION`, { headers: { ...bearer(token), "x-tenant-id": tenantB } }).then((r) => r.json());
   check("tenant A sees its asset", (listA.assets ?? []).some((a) => a.id === asset.id));
   check("tenant B does NOT see tenant A asset", !(listB.assets ?? []).some((a) => a.id === asset.id));
 
   // 4. Cross-tenant delete is refused.
   const forbidden = await fetch(`${baseUrl}/media/${asset.id}`, {
     method: "DELETE",
-    headers: { "x-tenant-id": tenantB },
+    headers: { ...bearer(token), "x-tenant-id": tenantB },
   });
   check("tenant B cannot delete tenant A asset", forbidden.status === 403 || forbidden.status === 404, `status ${forbidden.status}`);
 
@@ -98,7 +102,7 @@ async function main() {
   check("reject oversize upload", oversized.status === 422, `status ${oversized.status}`);
 
   // 7. Owner deletes; then it is gone.
-  const removed = await fetch(`${baseUrl}/media/${asset.id}`, { method: "DELETE", headers: { "x-tenant-id": tenantA } });
+  const removed = await fetch(`${baseUrl}/media/${asset.id}`, { method: "DELETE", headers: { ...bearer(token), "x-tenant-id": tenantA } });
   check("owner deletes asset (204)", removed.status === 204, `status ${removed.status}`);
   const after = await fetch(`${origin}${publicPath(asset.url)}`);
   check("deleted asset now 404", after.status === 404, `status ${after.status}`);

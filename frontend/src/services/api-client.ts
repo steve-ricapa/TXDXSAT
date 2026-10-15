@@ -1,7 +1,22 @@
 import { env } from "@/lib/env";
+import { getToken, setToken } from "@/modules/auth/lib/auth-store";
 
 export interface ApiErrorPayload {
   error?: { code?: string; message?: string; details?: unknown; requestId?: string };
+}
+
+/** `Authorization` header for the current session, or `{}` when anonymous. */
+export function authHeader(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Called by any client when the server answers 401: drop the (now invalid)
+ * session so the UI falls back to the login screen.
+ */
+export function noteUnauthorized(status: number): void {
+  if (status === 401) setToken(null);
 }
 
 export class ApiError extends Error {
@@ -32,7 +47,11 @@ export interface RequestOptions {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const url = `${env.apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
-  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...authHeader(),
+    ...options.headers,
+  };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   const response = await fetch(url, {
@@ -42,6 +61,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     ...(options.signal ? { signal: options.signal } : {}),
   });
 
+  if (response.status === 401) noteUnauthorized(response.status);
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();

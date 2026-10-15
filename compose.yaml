@@ -60,6 +60,10 @@ services:
       STORAGE_DRIVER: local
       STORAGE_DIR: /app/storage
       STORAGE_MAX_BYTES: "5242880"
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-720}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
     volumes:
       # Persistent, named volume for uploaded images. Survives `docker compose
       # down` (without -v), image rebuilds and code updates. See docs/storage.md.

@@ -14,9 +14,11 @@
  *   node scripts/load-test.mjs http://localhost:8080/sat/api/v1 http://localhost:8080 /sat/socket.io 20,50,100
  */
 import { io } from "socket.io-client";
+import { bearer, getToken } from "./lib/auth.mjs";
 
 const apiBase = (process.argv[2] ?? "http://localhost:4100/api/v1").replace(/\/$/, "");
-const socketUrl = process.argv[3] ?? apiBase.replace(/\/api\/v1$/, "");
+// Socket.IO origin: the HTTP origin only (see smoke-live.mjs for the rationale).
+const socketUrl = process.argv[3] ?? new URL(apiBase).origin;
 const socketPath =
   process.argv[4] ?? (apiBase.includes("/sat") ? "/sat/socket.io" : "/socket.io");
 const counts = (process.argv[5] ?? "20,50,100")
@@ -25,6 +27,8 @@ const counts = (process.argv[5] ?? "20,50,100")
   .filter((value) => Number.isFinite(value) && value > 0);
 
 const socketOptions = { transports: ["websocket"], path: socketPath };
+
+let TOKEN = null;
 
 const quiz = {
   title: "Load Test Quiz",
@@ -38,7 +42,7 @@ const quiz = {
 async function post(path, body) {
   const res = await fetch(`${apiBase}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...bearer(TOKEN) },
     body: JSON.stringify(body ?? {}),
   });
   const json = await res.json().catch(() => ({}));
@@ -199,6 +203,7 @@ async function runCount(playerCount) {
 async function main() {
   console.log(`Load test -> ${apiBase} (socket path ${socketPath})`);
   console.log(`Player counts: ${counts.join(", ")}`);
+  TOKEN = await getToken(apiBase);
   const summary = [];
   for (const count of counts) {
     // eslint-disable-next-line no-await-in-loop

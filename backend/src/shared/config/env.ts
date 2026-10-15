@@ -57,6 +57,13 @@ const schema = z.object({
   STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
   /// Public path prefix used to build absolute media URLs stored on questions.
   STORAGE_PUBLIC_PREFIX: z.string().startsWith("/").default("/api/v1/media"),
+
+  /// Auth. Login sessions are opaque tokens stored (hashed) in the database.
+  SESSION_TTL_HOURS: z.coerce.number().int().positive().default(720),
+  /// First superadmin bootstrap. Only applied while the platform has no users.
+  SUPERADMIN_EMAIL: z.string().default(""),
+  SUPERADMIN_PASSWORD: z.string().default(""),
+  SUPERADMIN_NAME: z.string().default("Super Admin"),
 });
 
 export type Env = z.infer<typeof schema>;
