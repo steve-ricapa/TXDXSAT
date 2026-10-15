@@ -713,6 +713,7 @@ export class GameEngine {
       text: question.text,
       options: question.options,
       imageUrl: question.imageUrl,
+      optionImages: question.optionImages,
       timeSec: question.timeSec,
       endsAt,
       optionOrder: this.optionOrderFor(session, question),

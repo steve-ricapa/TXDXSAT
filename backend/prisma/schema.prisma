@@ -145,6 +145,9 @@ model Question {
   correctNumber Int?       @map("correct_number")
   explanation String?
   imageUrl    String?      @map("image_url")
+  /// Optional per-answer images, parallel to `options` (Fase 3). JSON array of
+  /// string|null where each entry is a media URL or an external URL.
+  optionImages Json?       @map("option_images")
   baseScore   Int          @default(500) @map("base_score")
   timeSec     Int          @default(20) @map("time_sec")
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -222,4 +225,41 @@ model LiveAnswer {
   @@index([sessionId])
   @@index([tenantId])
   @@map("live_answers")
+}
+
+// ---------------------------------------------------------------------------
+// Media assets (Fase 3) — locally stored images for questions and answers
+// ---------------------------------------------------------------------------
+
+/// Where a media asset is logically used. Drives the storage sub-directory and
+/// the reuse picker in the editor.
+enum MediaPurpose {
+  QUESTION
+  ANSWER
+  LABORATORY
+}
+
+/// Metadata for a file stored on the persistent volume. The bytes are NEVER kept
+/// in PostgreSQL (no BYTEA/Base64) — only the descriptor below is.
+model MediaAsset {
+  id          String       @id @default(uuid()) @db.Uuid
+  /// Owning tenant. Null means platform-shared (visible across tenants).
+  tenantId    String?      @map("tenant_id") @db.Uuid
+  purpose     MediaPurpose @default(QUESTION)
+  /// Server-generated relative path inside the storage root (the file key).
+  key         String       @unique @map("storage_key") @db.VarChar(400)
+  mimeType    String       @map("mime_type") @db.VarChar(80)
+  size        Int
+  width       Int?
+  height      Int?
+  checksum    String?      @db.VarChar(64)
+  /// Optional back-reference to the question/answer that uses the asset.
+  questionId  String?      @map("question_id") @db.Uuid
+  answerIndex Int?         @map("answer_index")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId])
+  @@index([purpose])
+  @@index([questionId])
+  @@map("media_assets")
 }

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import type { PublicQuestion } from "../lib/protocol";
+import { paletteFor } from "../lib/answer-style";
+import { AnswerCard } from "./AnswerCard";
+import { AnswerShape } from "./AnswerShape";
 
 export interface AnswerSubmission {
   chosenIndex?: number;
@@ -7,120 +10,88 @@ export interface AnswerSubmission {
   chosenText?: string;
 }
 
-/** Option text as shown at a display slot (server shuffles via `optionOrder`). */
-function optionText(question: PublicQuestion, slot: number): string {
+/** Option text at a display slot (server shuffles via `optionOrder`). */
+export function optionText(question: PublicQuestion, slot: number): string {
   return question.options[question.optionOrder[slot] ?? slot] ?? "";
 }
 
+/** Option image at a display slot. */
+function optionImage(question: PublicQuestion, slot: number): string | null {
+  const original = question.optionOrder[slot] ?? slot;
+  return question.optionImages?.[original] ?? null;
+}
+
 /**
- * Participant answer UI. Supports every Fase 2 question type. Single-choice
- * submits on tap; multi/typed questions require an explicit submit. The server
- * remains authoritative and rejects anything out of order.
+ * Participant answer pad. Large, thumb-friendly, no scrolling. Single-choice
+ * submits on tap; multi-select and typed answers need an explicit submit. After
+ * answering the pad visually locks. The server remains authoritative.
  */
 export function QuestionPanel({
   question,
   answered,
   onSubmit,
+  submitted,
 }: {
   question: PublicQuestion;
   answered: boolean;
   onSubmit: (answer: AnswerSubmission) => void;
+  submitted?: { slot?: number; text?: string } | null;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
   const [text, setText] = useState("");
 
-  // Reset local selection whenever a new question opens.
   useEffect(() => {
     setSelected([]);
     setText("");
   }, [question.questionId]);
 
   const slots = question.options.map((_, index) => index);
+  const isMulti = question.type === "multi_select";
 
   if (answered) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/10 p-8 text-center">
-        <span className="text-4xl">✅</span>
-        <p className="text-lg font-semibold text-white">¡Respuesta enviada!</p>
-        <p className="text-sm text-white/60">Espera a que el anfitrión muestre los resultados.</p>
-      </div>
-    );
-  }
-
-  if (question.type === "multiple_choice" || question.type === "true_false") {
-    return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {slots.map((slot) => (
-          <button
-            key={slot}
-            type="button"
-            onClick={() => onSubmit({ chosenIndex: slot })}
-            className="min-h-20 rounded-2xl bg-white/90 px-4 py-5 text-left text-base font-semibold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:bg-white active:scale-[0.98]"
-          >
-            <span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-sm text-white">
-              {String.fromCharCode(65 + slot)}
-            </span>
-            {optionText(question, slot)}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  if (question.type === "multi_select") {
-    const toggle = (slot: number) =>
-      setSelected((current) =>
-        current.includes(slot) ? current.filter((s) => s !== slot) : [...current, slot],
-      );
-    return (
-      <div className="space-y-3">
-        <p className="text-sm text-white/70">Selecciona todas las que apliquen.</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {slots.map((slot) => {
-            const active = selected.includes(slot);
-            return (
-              <button
-                key={slot}
-                type="button"
-                onClick={() => toggle(slot)}
-                className={`min-h-16 rounded-xl px-4 py-4 text-left font-medium transition ${
-                  active ? "bg-emerald-400 text-slate-900" : "bg-white/90 text-slate-900 hover:bg-white"
-                }`}
-              >
-                {optionText(question, slot)}
-              </button>
-            );
-          })}
+      <div className="pop-in flex h-full flex-col items-center justify-center gap-5 text-center">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/20 text-5xl pulse-ring">
+          ✅
         </div>
-        <button
-          type="button"
-          disabled={selected.length === 0}
-          onClick={() => onSubmit({ chosenIndices: [...selected].sort((a, b) => a - b) })}
-          className="w-full rounded-xl bg-[var(--color-brand-500)] py-3 font-semibold text-white disabled:opacity-40"
-        >
-          Enviar {selected.length > 0 ? `(${selected.length})` : ""}
-        </button>
+        <div>
+          <p className="text-2xl font-black text-white">¡Respuesta enviada!</p>
+          <p className="mt-1 text-sm text-white/60">Espera a que el anfitrión muestre los resultados.</p>
+        </div>
+
+        {(submitted?.slot !== undefined || submitted?.text) && (
+          <div className="w-full max-w-sm">
+            {submitted?.slot !== undefined && submitted.slot >= 0 ? (
+              <AnswerCard slot={submitted.slot} text={optionText(question, submitted.slot)} variant="player" state="idle" />
+            ) : (
+              <p className="rounded-2xl bg-white/15 px-4 py-4 font-semibold text-white">
+                “{submitted?.text}”
+              </p>
+            )}
+          </div>
+        )}
+
+        <p className="text-xs uppercase tracking-widest text-white/40">🔒 Respuesta bloqueada</p>
       </div>
     );
   }
 
-  if (question.type === "closest_to") {
+  if (question.type === "open_text") {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-white/70">Escribe el número que creas más cercano.</p>
+      <div className="flex h-full flex-col justify-center gap-4">
         <input
-          type="number"
-          inputMode="numeric"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          className="w-full rounded-xl bg-white/90 px-4 py-4 text-lg font-semibold text-slate-900"
-          placeholder="Tu número"
+          placeholder="Escribe tu respuesta…"
+          autoFocus
+          maxLength={300}
+          className="w-full rounded-2xl border-4 border-white/20 bg-white/10 px-5 py-5 text-xl font-bold text-white placeholder:text-white/40 focus:border-white/60 focus:outline-none"
         />
         <button
           type="button"
-          disabled={text.trim() === ""}
+          disabled={!text.trim()}
           onClick={() => onSubmit({ chosenText: text.trim() })}
-          className="w-full rounded-xl bg-[var(--color-brand-500)] py-3 font-semibold text-white disabled:opacity-40"
+          className="rounded-2xl bg-emerald-500 px-6 py-5 text-xl font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
         >
           Enviar
         </button>
@@ -128,27 +99,79 @@ export function QuestionPanel({
     );
   }
 
-  // open_text
+  if (question.type === "closest_to") {
+    return (
+      <div className="flex h-full flex-col justify-center gap-4">
+        <input
+          value={text}
+          onChange={(event) => setText(event.target.value.replace(/[^\d-]/g, ""))}
+          placeholder="Escribe un número…"
+          inputMode="numeric"
+          autoFocus
+          className="w-full rounded-2xl border-4 border-white/20 bg-white/10 px-5 py-6 text-center text-4xl font-black text-white placeholder:text-2xl placeholder:text-white/40 focus:border-white/60 focus:outline-none"
+        />
+        <button
+          type="button"
+          disabled={text.trim() === ""}
+          onClick={() => onSubmit({ chosenText: text.trim() })}
+          className="rounded-2xl bg-emerald-500 px-6 py-5 text-xl font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+        >
+          Enviar
+        </button>
+      </div>
+    );
+  }
+
+  // multiple_choice / true_false / multi_select
+  const twoOptions = question.options.length === 2 && question.type === "true_false";
+
   return (
-    <div className="space-y-3">
-      <input
-        type="text"
-        value={text}
-        maxLength={120}
-        onChange={(event) => setText(event.target.value)}
-        className="w-full rounded-xl bg-white/90 px-4 py-4 text-lg font-semibold text-slate-900"
-        placeholder="Escribe tu respuesta"
-      />
-      <button
-        type="button"
-        disabled={text.trim() === ""}
-        onClick={() => onSubmit({ chosenText: text.trim() })}
-        className="w-full rounded-xl bg-[var(--color-brand-500)] py-3 font-semibold text-white disabled:opacity-40"
-      >
-        Enviar
-      </button>
+    <div className="flex h-full flex-col gap-3">
+      <div className={`grid flex-1 content-stretch gap-3 ${twoOptions ? "grid-cols-1" : "grid-cols-1"}`}>
+        {slots.map((slot) => {
+          const isSelected = selected.includes(slot);
+          return (
+            <AnswerCard
+              key={slot}
+              slot={slot}
+              text={optionText(question, slot)}
+              imageUrl={optionImage(question, slot)}
+              variant="player"
+              state={isSelected ? "selected" : "idle"}
+              index={slot}
+              className="flex-1"
+              onClick={() =>
+                isMulti
+                  ? setSelected((current) =>
+                      current.includes(slot)
+                        ? current.filter((value) => value !== slot)
+                        : [...current, slot].sort((a, b) => a - b),
+                    )
+                  : onSubmit({ chosenIndex: slot })
+              }
+            />
+          );
+        })}
+      </div>
+
+      {isMulti && (
+        <button
+          type="button"
+          disabled={selected.length === 0}
+          onClick={() => onSubmit({ chosenIndices: selected })}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-4 text-lg font-black uppercase tracking-wide text-white shadow-[0_6px_0_0_#166534] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+        >
+          Enviar {selected.length > 0 && `(${selected.length})`}
+        </button>
+      )}
+
+      {isMulti && selected.length > 0 && (
+        <p className="flex items-center justify-center gap-2 text-center text-xs text-white/60">
+          {selected.map((slot) => (
+            <AnswerShape key={slot} shape={paletteFor(slot).shape} className="h-3 w-3" />
+          ))}
+        </p>
+      )}
     </div>
   );
 }
-
-export { optionText };

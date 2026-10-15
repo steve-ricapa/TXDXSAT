@@ -4,6 +4,7 @@ import type {
   LeaderboardEntry,
   LiveSessionStatus,
   PlayerSnapshot,
+  QuizDetail,
   QuizQuestion,
   QuizSummary,
 } from "../domain/types.ts";
@@ -33,6 +34,7 @@ export interface NewQuestionInput {
   correctNumber?: number | null;
   explanation?: string | null;
   imageUrl?: string | null;
+  optionImages?: (string | null)[] | null;
   baseScore?: number;
   timeSec?: number;
 }
@@ -51,6 +53,11 @@ export interface LiveSessionStore {
   }): Promise<{ id: string; questionCount: number }>;
   listQuizzes(): Promise<QuizSummary[]>;
   getQuizTitle(quizId: string): Promise<string | null>;
+  getQuizDetail(quizId: string): Promise<QuizDetail | null>;
+  updateQuiz(
+    quizId: string,
+    input: { title: string; description: string | null; tenantId: string | null; questions: NewQuestionInput[] },
+  ): Promise<{ id: string; questionCount: number } | null>;
   findById(id: string): Promise<SessionRecord | null>;
   findByPin(pin: string): Promise<SessionRecord | null>;
   isPinTaken(pin: string): Promise<boolean>;

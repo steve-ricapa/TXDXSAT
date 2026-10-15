@@ -57,6 +57,13 @@ services:
       DISPATCHER_MAX_ATTEMPTS: "10"
       DISPATCHER_LEASE_MS: "30000"
       RUN_MIGRATIONS: "true"
+      STORAGE_DRIVER: local
+      STORAGE_DIR: /app/storage
+      STORAGE_MAX_BYTES: "5242880"
+    volumes:
+      # Persistent, named volume for uploaded images. Survives `docker compose
+      # down` (without -v), image rebuilds and code updates. See docs/storage.md.
+      - txdxsat_uploads:/app/storage
     depends_on:
       db:
         condition: service_healthy
@@ -88,6 +95,10 @@ services:
 volumes:
   txdxsat-db-data:
     name: txdxsat-db-data
+  # Uploaded images (questions/answers). Back this up externally — see
+  # docs/storage.md: `docker compose down -v` deletes it.
+  txdxsat_uploads:
+    name: txdxsat_uploads
 
 networks:
   edge:

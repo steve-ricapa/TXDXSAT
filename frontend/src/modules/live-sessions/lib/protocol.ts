@@ -52,6 +52,8 @@ export interface PublicQuestion {
   text: string;
   options: string[];
   imageUrl: string | null;
+  /** Optional per-answer images in *original* option order (Fase 3). */
+  optionImages: (string | null)[];
   timeSec: number;
   endsAt: string;
   /** optionOrder[displaySlot] = original index. */

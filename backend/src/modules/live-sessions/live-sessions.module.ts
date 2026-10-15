@@ -6,8 +6,10 @@ import { GameEngine, type GameEngineOptions } from "./application/game-engine.ts
 import {
   CreateLiveSessionUseCase,
   CreateQuizUseCase,
+  GetQuizDetailUseCase,
   GetSessionResultsUseCase,
   ListQuizzesUseCase,
+  UpdateQuizUseCase,
 } from "./application/live-session.usecases.ts";
 import type { GameBroadcaster } from "./application/ports.ts";
 import { LiveSessionRepository } from "./infrastructure/live-session.repository.ts";
@@ -80,6 +82,8 @@ export function createLiveSessionModule(
   const useCases = {
     createQuiz: new CreateQuizUseCase(repository),
     listQuizzes: new ListQuizzesUseCase(repository),
+    getQuizDetail: new GetQuizDetailUseCase(repository),
+    updateQuiz: new UpdateQuizUseCase(repository),
     createSession: new CreateLiveSessionUseCase(repository),
     getResults: new GetSessionResultsUseCase(repository),
   };

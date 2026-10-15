@@ -39,6 +39,8 @@ export interface QuizQuestion {
   correctNumber: number | null;
   explanation: string | null;
   imageUrl: string | null;
+  /** Optional per-answer images, parallel to `options` (Fase 3). */
+  optionImages: (string | null)[];
   baseScore: number;
   timeSec: number;
 }
@@ -51,6 +53,16 @@ export interface QuizSummary {
   createdAt: string;
 }
 
+/** Full quiz including answers — used by the authoring editor (never players). */
+export interface QuizDetail {
+  id: string;
+  tenantId: string | null;
+  title: string;
+  description: string | null;
+  createdAt: string;
+  questions: QuizQuestion[];
+}
+
 /** The question shape broadcast to clients — never leaks the correct answer. */
 export interface PublicQuestion {
   index: number;
@@ -60,6 +72,8 @@ export interface PublicQuestion {
   text: string;
   options: string[];
   imageUrl: string | null;
+  /** Optional per-answer images in *original* option order (Fase 3). */
+  optionImages: (string | null)[];
   timeSec: number;
   /** Absolute ISO timestamp when the question closes. */
   endsAt: string;

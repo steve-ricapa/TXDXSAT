@@ -5,6 +5,7 @@ import type {
   LeaderboardEntry,
   LiveSessionStatus,
   PlayerSnapshot,
+  QuizDetail,
   QuizQuestion,
   QuizSummary,
   QuestionType,
@@ -50,6 +51,33 @@ function jsonArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
 }
 
+/** JSON array of `string | null` (per-answer images). */
+function jsonNullableArray(value: unknown): (string | null)[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => (item === null || item === undefined ? null : String(item)));
+}
+
+/** Prisma `create` payload for a question (shared by create + update). */
+function questionCreateData(q: NewQuestionInput, index: number) {
+  return {
+    orderIndex: index,
+    type: TYPE_TO_PRISMA[q.type],
+    text: q.text,
+    options: (q.options ?? []) as Prisma.InputJsonValue,
+    correctIndex: q.correctIndex ?? null,
+    correctIndices: (q.correctIndices ?? undefined) as Prisma.InputJsonValue,
+    correctText: q.correctText ?? null,
+    rangeMin: q.rangeMin ?? null,
+    rangeMax: q.rangeMax ?? null,
+    correctNumber: q.correctNumber ?? null,
+    explanation: q.explanation ?? null,
+    imageUrl: q.imageUrl ?? null,
+    optionImages: (q.optionImages ?? undefined) as Prisma.InputJsonValue,
+    baseScore: q.baseScore ?? 500,
+    timeSec: q.timeSec ?? 20,
+  };
+}
+
 function mapQuestion(row: {
   id: string;
   orderIndex: number;
@@ -64,6 +92,7 @@ function mapQuestion(row: {
   correctNumber: number | null;
   explanation: string | null;
   imageUrl: string | null;
+  optionImages: unknown;
   baseScore: number;
   timeSec: number;
 }): QuizQuestion {
@@ -83,6 +112,7 @@ function mapQuestion(row: {
     correctNumber: row.correctNumber,
     explanation: row.explanation,
     imageUrl: row.imageUrl,
+    optionImages: jsonNullableArray(row.optionImages),
     baseScore: row.baseScore,
     timeSec: row.timeSec,
   };
@@ -101,22 +131,7 @@ export class LiveSessionRepository implements LiveSessionStore {
         description: input.description ?? null,
         tenantId: input.tenantId ?? null,
         questions: {
-          create: input.questions.map((q, index) => ({
-            orderIndex: index,
-            type: TYPE_TO_PRISMA[q.type],
-            text: q.text,
-            options: (q.options ?? []) as Prisma.InputJsonValue,
-            correctIndex: q.correctIndex ?? null,
-            correctIndices: (q.correctIndices ?? undefined) as Prisma.InputJsonValue,
-            correctText: q.correctText ?? null,
-            rangeMin: q.rangeMin ?? null,
-            rangeMax: q.rangeMax ?? null,
-            correctNumber: q.correctNumber ?? null,
-            explanation: q.explanation ?? null,
-            imageUrl: q.imageUrl ?? null,
-            baseScore: q.baseScore ?? 500,
-            timeSec: q.timeSec ?? 20,
-          })),
+          create: input.questions.map((q, index) => questionCreateData(q, index)),
         },
       },
       select: { id: true, _count: { select: { questions: true } } },
@@ -155,6 +170,58 @@ export class LiveSessionRepository implements LiveSessionStore {
   async getQuizTitle(quizId: string): Promise<string | null> {
     const row = await prisma.quiz.findUnique({ where: { id: quizId }, select: { title: true } });
     return row?.title ?? null;
+  }
+
+  async getQuizDetail(quizId: string): Promise<QuizDetail | null> {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      select: {
+        id: true,
+        tenantId: true,
+        title: true,
+        description: true,
+        createdAt: true,
+      },
+    });
+    if (!quiz) return null;
+    const questions = await this.getQuizQuestions(quizId);
+    return {
+      id: quiz.id,
+      tenantId: quiz.tenantId,
+      title: quiz.title,
+      description: quiz.description,
+      createdAt: quiz.createdAt.toISOString(),
+      questions,
+    };
+  }
+
+  /** Replace a quiz's metadata and questionnaire atomically. */
+  async updateQuiz(
+    quizId: string,
+    input: {
+      title: string;
+      description: string | null;
+      tenantId: string | null;
+      questions: NewQuestionInput[];
+    },
+  ): Promise<{ id: string; questionCount: number } | null> {
+    const existing = await prisma.quiz.findUnique({ where: { id: quizId }, select: { id: true } });
+    if (!existing) return null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.question.deleteMany({ where: { quizId } });
+      return tx.quiz.update({
+        where: { id: quizId },
+        data: {
+          title: input.title,
+          description: input.description ?? null,
+          tenantId: input.tenantId ?? null,
+          questions: { create: input.questions.map((q, index) => questionCreateData(q, index)) },
+        },
+        select: { id: true, _count: { select: { questions: true } } },
+      });
+    });
+    return { id: updated.id, questionCount: updated._count.questions };
   }
 
   /** True when the PIN is currently in use by a non-finished session. */

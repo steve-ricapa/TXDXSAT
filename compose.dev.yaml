@@ -51,11 +51,15 @@ services:
       DISPATCHER_ENABLED: "true"
       DISPATCHER_INTERVAL_MS: "1000"
       RUN_MIGRATIONS: "true"
+      STORAGE_DRIVER: local
+      STORAGE_DIR: /app/storage
     volumes:
       # Hot reload: source and Prisma schema are mounted over the image copy.
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma
       - ./backend/prisma.config.ts:/app/prisma.config.ts
+      # Uploaded images survive restarts/rebuilds in dev too.
+      - txdxsat-dev-uploads:/app/storage
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     depends_on:
@@ -91,6 +95,8 @@ services:
 volumes:
   txdxsat-dev-db-data:
     name: txdxsat-dev-db-data
+  txdxsat-dev-uploads:
+    name: txdxsat-dev-uploads
 
 networks:
   dev:

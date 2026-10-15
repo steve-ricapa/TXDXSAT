@@ -8,6 +8,7 @@ import { JoinPage } from "@/modules/live-sessions/pages/JoinPage";
 import { PlayPage } from "@/modules/live-sessions/pages/PlayPage";
 import { HostPage } from "@/modules/live-sessions/pages/HostPage";
 import { PresentPage } from "@/modules/live-sessions/pages/PresentPage";
+import { QuizEditorPage } from "@/modules/live-sessions/pages/QuizEditorPage";
 import { NotFoundPage } from "./NotFoundPage";
 
 /**
@@ -38,6 +39,7 @@ export const router = createBrowserRouter(
     { path: "live/host/:sessionId", element: <HostPage /> },
     { path: "live/host", element: <HostPage /> },
     { path: "live/present/:sessionId", element: <PresentPage /> },
+    { path: "live/editor", element: <QuizEditorPage /> },
   ],
   { basename: resolveBasename(import.meta.env.BASE_URL) },
 );

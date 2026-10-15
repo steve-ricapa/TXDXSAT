@@ -49,6 +49,14 @@ const schema = z.object({
   DISPATCHER_LEASE_MS: z.coerce.number().int().positive().default(30_000),
   DISPATCHER_BACKOFF_MS: z.coerce.number().int().positive().default(5_000),
   DISPATCHER_WORKER_ID: z.string().default(""),
+
+  /// Media/file storage (Fase 3). Local persistent volume today; the adapter is
+  /// swappable for S3 later without touching controllers or use cases.
+  STORAGE_DRIVER: z.enum(["local"]).default("local"),
+  STORAGE_DIR: z.string().min(1).default("storage"),
+  STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
+  /// Public path prefix used to build absolute media URLs stored on questions.
+  STORAGE_PUBLIC_PREFIX: z.string().startsWith("/").default("/api/v1/media"),
 });
 
 export type Env = z.infer<typeof schema>;

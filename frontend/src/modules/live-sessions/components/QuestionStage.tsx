@@ -1,11 +1,24 @@
 import type { PublicQuestion, ResultsPayload } from "../lib/protocol";
+import { resolveMediaUrl } from "../lib/media";
+import { AnswerCard, SlotChip } from "./AnswerCard";
 import { TimerRing } from "./TimerRing";
-import { optionText } from "./QuestionPanel";
+
+/** Option text + image at a display slot (server shuffles via `optionOrder`). */
+function optionAt(question: PublicQuestion, slot: number): { text: string; image: string | null } {
+  const original = question.optionOrder[slot] ?? slot;
+  return {
+    text: question.options[original] ?? "",
+    image: question.optionImages?.[original] ?? null,
+  };
+}
 
 /**
- * Big-screen presentation of the current question (host control + presenter).
- * Before reveal it shows the answer count climbing; after reveal it overlays the
- * correct option(s) and the vote distribution.
+ * Projector board for the current question.
+ *
+ * Layout: header (number + question), centre (image + circular timer + answers
+ * received) and a footer of four big coloured answer tiles. It reflows
+ * automatically when a question has no image. Optimised for 1920×1080 but
+ * fluid down to tablets.
  */
 export function QuestionStage({
   question,
@@ -24,79 +37,128 @@ export function QuestionStage({
   const distribution = revealed ? results.distribution : [];
   const maxVotes = Math.max(1, ...distribution);
   const correct = new Set(revealed ? results.correctDisplayIndices : []);
+  const image = resolveMediaUrl(question.imageUrl);
+  const isTextType = question.type === "open_text" || question.type === "closest_to";
+  const slots = question.options.map((_, index) => index);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-white/50">
-            Pregunta {question.index + 1} / {question.total}
-          </p>
-          <h2 className="mt-1 text-2xl font-bold text-white sm:text-3xl">{question.text}</h2>
-        </div>
-        {!revealed && <TimerRing remaining={remaining} total={question.timeSec} />}
-      </div>
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-4 sm:gap-6">
+      {/* Header — number + question */}
+      <header className="text-center">
+        <span className="inline-block rounded-full bg-white/15 px-4 py-1 text-sm font-bold uppercase tracking-[0.25em] text-white/80">
+          Pregunta {question.index + 1} / {question.total}
+        </span>
+        <h1 className="mx-auto mt-3 max-w-6xl text-pretty text-2xl font-black leading-tight text-white drop-shadow sm:text-3xl xl:text-5xl">
+          {question.text}
+        </h1>
+      </header>
 
-      {question.imageUrl && (
-        <img src={question.imageUrl} alt="" className="max-h-64 rounded-xl object-contain" />
-      )}
+      {/* Centre — image + timer + answers received */}
+      <section className="flex min-h-0 items-center justify-center gap-6 xl:gap-12">
+        {image && (
+          <img
+            src={image}
+            alt=""
+            className="slide-up max-h-full min-h-0 flex-1 rounded-2xl object-contain shadow-2xl"
+            style={{ maxHeight: "100%" }}
+          />
+        )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {question.options.map((_, slot) => {
-          const text = optionText(question, slot);
-          const votes = distribution[slot] ?? 0;
-          const isCorrect = correct.has(slot);
-          return (
-            <div
-              key={slot}
-              className={`relative overflow-hidden rounded-2xl px-4 py-5 text-left font-semibold transition ${
-                revealed
-                  ? isCorrect
-                    ? "bg-emerald-500 text-white"
-                    : "bg-slate-700/70 text-white/80"
-                  : "bg-white/15 text-white"
-              }`}
-            >
-              {revealed && (
-                <span
-                  className="absolute inset-y-0 left-0 bg-white/20"
-                  style={{ width: `${(votes / maxVotes) * 100}%` }}
-                  aria-hidden
-                />
-              )}
-              <span className="relative flex items-center justify-between gap-3">
-                <span>
-                  <span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/25 text-sm">
-                    {String.fromCharCode(65 + slot)}
-                  </span>
-                  {text}
-                </span>
-                {revealed && <span className="tabular-nums text-sm">{votes}</span>}
-              </span>
+        <div className="flex shrink-0 flex-col items-center gap-4">
+          {!revealed && !isTextType && (
+            <TimerRing remaining={remaining} total={question.timeSec} size={image ? 120 : 150} />
+          )}
+          {!revealed && isTextType && (
+            <TimerRing remaining={remaining} total={question.timeSec} size={image ? 120 : 150} />
+          )}
+
+          {revealed ? (
+            <div className="pop-in rounded-2xl bg-white/15 px-6 py-3 text-center">
+              <p className="text-2xl font-black uppercase tracking-wide text-white sm:text-3xl">Resultados</p>
+              <p className="text-sm text-white/70">
+                {results?.answeredCount ?? answeredCount} respuestas
+              </p>
             </div>
-          );
-        })}
-      </div>
+          ) : (
+            <div className="rounded-2xl bg-white/15 px-6 py-3 text-center">
+              <p className="text-3xl font-black tabular-nums text-white sm:text-4xl">
+                {answeredCount}
+                <span className="text-lg font-bold text-white/60 sm:text-2xl"> / {playerCount}</span>
+              </p>
+              <p className="text-[0.65rem] uppercase tracking-widest text-white/60">
+                respuestas recibidas
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
 
-      {question.type === "open_text" && revealed && results?.correctText && (
-        <p className="rounded-xl bg-emerald-500/20 px-4 py-3 text-emerald-100">
-          Respuesta correcta: <strong>{results.correctText}</strong>
-        </p>
-      )}
-      {question.type === "closest_to" && revealed && results?.correctNumber != null && (
-        <p className="rounded-xl bg-emerald-500/20 px-4 py-3 text-emerald-100">
-          Número correcto: <strong>{results.correctNumber}</strong>
-        </p>
-      )}
-      {revealed && results?.explanation && (
-        <p className="text-sm text-white/70">{results.explanation}</p>
-      )}
+      {/* Footer — answers */}
+      <footer className="min-h-0">
+        {isTextType ? (
+          <div className="mx-auto flex max-w-3xl flex-col items-center gap-3">
+            {!revealed ? (
+              <p className="rounded-2xl bg-white/10 px-6 py-4 text-center text-lg font-semibold text-white/80">
+                {question.type === "open_text"
+                  ? "Los jugadores escriben su respuesta en el móvil…"
+                  : "Los jugadores proponen un número en el móvil…"}
+              </p>
+            ) : (
+              <div className="pop-in rounded-2xl bg-emerald-500 px-8 py-6 text-center shadow-[0_6px_0_0_#166534]">
+                <p className="text-sm uppercase tracking-widest text-white/80">Respuesta correcta</p>
+                <p className="text-3xl font-black text-white">
+                  {question.type === "open_text"
+                    ? results?.correctText ?? "—"
+                    : results?.correctNumber ?? "—"}
+                </p>
+              </div>
+            )}
+            {revealed && results?.explanation && (
+              <p className="text-center text-sm text-white/70">{results.explanation}</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              {slots.map((slot) => {
+                const { text, image: optionImage } = optionAt(question, slot);
+                const votes = distribution[slot] ?? 0;
+                const state = !revealed
+                  ? "idle"
+                  : correct.has(slot)
+                    ? "correct"
+                    : "dimmed";
+                return (
+                  <AnswerCard
+                    key={slot}
+                    slot={slot}
+                    text={text}
+                    imageUrl={optionImage}
+                    state={state}
+                    votes={votes}
+                    maxVotes={maxVotes}
+                    showVotes={revealed}
+                    index={slot}
+                  />
+                );
+              })}
+            </div>
 
-      {!revealed && (
-        <p className="text-center text-sm text-white/60">
-          {answeredCount} / {playerCount} han respondido
-        </p>
-      )}
+            {revealed && results?.explanation && (
+              <p className="pop-in mx-auto mt-3 max-w-4xl text-center text-sm text-white/75 sm:text-base">
+                {results.explanation}
+              </p>
+            )}
+            {!revealed && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-white/45">
+                {slots.map((slot) => (
+                  <SlotChip key={slot} slot={slot} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </footer>
     </div>
   );
 }

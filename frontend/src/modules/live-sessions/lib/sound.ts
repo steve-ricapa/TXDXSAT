@@ -4,8 +4,11 @@
  * Ported from the MIT-licensed `quizz` project
  * (https://github.com/Lawndlwd/quizz) and adapted for TXDXSAT: the per-theme
  * "flavors" were removed (TXDXSAT ships a single visual identity) but the
- * synthesis recipes — chimes, buzzer, drumroll, fanfare — are unchanged. All
- * sounds are generated at runtime; no audio assets are bundled.
+ * synthesis recipes — chimes, buzzer, drumroll, fanfare — are unchanged. Fase 3
+ * adds procedural background music (lobby / question) and a volume control.
+ *
+ * Everything is generated at runtime; no audio assets are bundled, which keeps
+ * the 2 vCPU / 4 GB target box small and avoids any licensing question.
  */
 
 export type SoundName =
@@ -15,20 +18,33 @@ export type SoundName =
   | "wrong"
   | "drumroll"
   | "fanfare"
-  | "heartbeat";
+  | "heartbeat"
+  | "submit"
+  | "join";
+
+export type MusicKind = "lobby" | "question";
 
 const MUTE_KEY = "txdxsat:live:muted";
+const VOLUME_KEY = "txdxsat:live:volume";
+const BASE_GAIN = 0.22;
 
 class SoundManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private muted = false;
+  private volume = 0.85;
   private loops = new Map<SoundName, AudioBufferSourceNode>();
+  private musicSrc: AudioBufferSourceNode | null = null;
+  // private musicGain: GainNode | null = null; // removed to reduce type noise if unused
+  private musicKind: MusicKind | null = null;
+  private pendingMusic: MusicKind | null = null;
   private resumeBound = false;
 
   constructor() {
     if (typeof window !== "undefined") {
       this.muted = localStorage.getItem(MUTE_KEY) === "1";
+      const stored = Number(localStorage.getItem(VOLUME_KEY));
+      if (Number.isFinite(stored) && stored > 0) this.volume = Math.min(1, Math.max(0.05, stored));
     }
   }
 
@@ -41,12 +57,20 @@ class SoundManager {
       if (!Ctor) return null;
       this.ctx = new Ctor();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.22;
+      this.master.gain.value = BASE_GAIN * this.volume;
       this.master.connect(this.ctx.destination);
-      // Autoplay policy: resume on the first user gesture, once.
+      // Autoplay policy: resume on the first user gesture, once. Any music that
+      // was requested before the gesture is started here.
       if (!this.resumeBound) {
         this.resumeBound = true;
-        const resume = () => void this.ctx?.resume();
+        const resume = () => {
+          void this.ctx?.resume();
+          if (this.pendingMusic) {
+            const kind = this.pendingMusic;
+            this.pendingMusic = null;
+            this.startMusic(kind);
+          }
+        };
         window.addEventListener("pointerdown", resume, { once: true });
         window.addEventListener("keydown", resume, { once: true });
       }
@@ -60,11 +84,27 @@ class SoundManager {
       if (muted) localStorage.setItem(MUTE_KEY, "1");
       else localStorage.removeItem(MUTE_KEY);
     }
-    if (muted) this.stop();
+    if (muted) {
+      this.stop();
+      this.stopMusic();
+    }
   }
 
   isMuted(): boolean {
     return this.muted;
+  }
+
+  /** Master volume 0.05..1 (applies to effects and music). */
+  setVolume(volume: number): void {
+    this.volume = Math.min(1, Math.max(0.05, volume));
+    if (typeof window !== "undefined") localStorage.setItem(VOLUME_KEY, String(this.volume));
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(BASE_GAIN * this.volume, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  getVolume(): number {
+    return this.volume;
   }
 
   play(name: SoundName): void {
@@ -80,6 +120,13 @@ class SoundManager {
         break;
       case "blip":
         this.sweep(660, 880, 0.09, "triangle");
+        break;
+      case "submit":
+        this.sweep(520, 1040, 0.14, "sine");
+        break;
+      case "join":
+        this.blip(880, 0.07, "triangle", 0.7);
+        this.blip(1320, 0.09, "sine", 0.4);
         break;
       case "correct":
         this.correctChime();
@@ -121,6 +168,96 @@ class SoundManager {
     }
     this.loops.clear();
   }
+
+  // --- Background music ----------------------------------------------------
+
+  /** Start (and loop) procedural background music. Safe before first gesture. */
+  startMusic(kind: MusicKind): void {
+    if (this.muted) return;
+    const ctx = this.ensureCtx();
+    if (!ctx || !this.master) return;
+    void ctx.resume();
+    if (ctx.state === "suspended") {
+      // Browser will not allow audio yet: remember and start on first gesture.
+      this.pendingMusic = kind;
+      return;
+    }
+    if (this.musicKind === kind && this.musicSrc) return;
+
+    this.stopMusic();
+    const buffer = this.buildMusic(kind);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(kind === "lobby" ? 0.6 : 0.5, ctx.currentTime + 1.2);
+    src.connect(gain).connect(this.master);
+    src.start();
+
+    this.musicSrc = src;
+    this.musicKind = kind;
+  }
+
+  stopMusic(): void {
+    this.pendingMusic = null;
+    if (this.musicSrc) {
+      try {
+        this.musicSrc.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    this.musicSrc = null;
+    this.musicKind = null;
+  }
+
+  currentMusic(): MusicKind | null {
+    return this.musicKind;
+  }
+
+  /**
+   * Render a looping bed of notes into an AudioBuffer. Cheaper and more flexible
+   * than bundling audio files, and it respects the "no Kahoot audio" rule.
+   */
+  private buildMusic(kind: MusicKind): AudioBuffer {
+    const ctx = this.ctx as AudioContext;
+    const sampleRate = ctx.sampleRate;
+    const seconds = kind === "lobby" ? 6 : 4;
+    const length = Math.floor(sampleRate * seconds);
+    const buffer = ctx.createBuffer(1, length, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    // Note tables (Hz). Lobby = warm major arpeggio; question = tense minor pulse.
+    const melody =
+      kind === "lobby"
+        ? [261.63, 329.63, 392.0, 523.25, 392.0, 329.63]
+        : [220.0, 261.63, 293.66, 261.63];
+    const bass = kind === "lobby" ? [130.81, 196.0] : [110.0, 110.0];
+    const noteDur = seconds / (melody.length * (kind === "lobby" ? 2 : 2));
+    const bassDur = seconds / bass.length;
+
+    for (let i = 0; i < length; i += 1) {
+      const t = i / sampleRate;
+      const noteIndex = Math.floor(t / noteDur) % melody.length;
+      const noteT = (t % noteDur) / noteDur;
+      const freq = melody[noteIndex] ?? 261.63;
+      // Soft attack, smooth decay inside each note.
+      const env = Math.min(1, noteT / 0.08) * Math.max(0, 1 - noteT) ** 1.4;
+      const lead = Math.sin(2 * Math.PI * freq * t) * 0.22 * env;
+      const shimmer = Math.sin(2 * Math.PI * freq * 2 * t) * 0.05 * env;
+
+      const bassIndex = Math.floor(t / bassDur) % bass.length;
+      const bassT = (t % bassDur) / bassDur;
+      const bassEnv = Math.min(1, bassT / 0.15) * Math.max(0, 1 - bassT) ** 2;
+      const low = Math.sin(2 * Math.PI * (bass[bassIndex] ?? 110) * t) * 0.16 * bassEnv;
+
+      data[i] = lead + shimmer + low;
+    }
+    return buffer;
+  }
+
+  // --- Synth primitives ----------------------------------------------------
 
   private tone(freq: number, dur: number, osc: OscillatorType, startAt: number, gain = 1): void {
     const ctx = this.ctx;

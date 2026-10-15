@@ -2,10 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { getSocket } from "@/services/socket";
 import { Avatar } from "../components/Avatar";
+import { AnswerShape } from "../components/AnswerShape";
+import { Confetti } from "../components/Confetti";
 import { Leaderboard } from "../components/Leaderboard";
+import { LiveBackground } from "../components/LiveBackground";
+import { SoundControls } from "../components/SoundControls";
 import { QuestionPanel, type AnswerSubmission } from "../components/QuestionPanel";
 import { useCountdown } from "../hooks/useCountdown";
 import { useSocketEvent } from "../hooks/useSocketEvent";
+import { paletteFor } from "../lib/answer-style";
 import { ClientEvents, ServerEvents } from "../lib/protocol";
 import type {
   AnswerAckPayload,
@@ -16,11 +21,12 @@ import type {
   ResultsPayload,
   SessionStatePayload,
 } from "../lib/protocol";
+import { sound } from "../lib/sound";
 import { playerStore, type StoredPlayer } from "../lib/storage";
 
 type Phase = "connecting" | "lobby" | "question" | "results" | "ended";
 
-/** Player gameplay screen (`/live/play/:sessionId`). */
+/** Player gameplay screen (`/live/play/:sessionId`). Mobile-first, no scroll. */
 export function PlayPage() {
   const { sessionId = "" } = useParams();
   const stored = playerStore.load(sessionId);
@@ -31,11 +37,13 @@ export function PlayPage() {
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState<PublicQuestion | null>(null);
   const [answered, setAnswered] = useState(false);
+  const [submitted, setSubmitted] = useState<{ slot?: number; text?: string } | null>(null);
   const [ack, setAck] = useState<AnswerAckPayload | null>(null);
   const [results, setResults] = useState<ResultsPayload | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [ended, setEnded] = useState<GameEndedPayload | null>(null);
   const [state, setState] = useState<SessionStatePayload | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const joinedRef = useRef(false);
   const remaining = useCountdown(question?.endsAt ?? null);
 
@@ -80,7 +88,13 @@ export function PlayPage() {
 
   useSocketEvent<SessionStatePayload>(ServerEvents.sessionState, (payload) => {
     setState(payload);
-    if (payload.status === "WAITING") setPhase((p) => (p === "connecting" ? "lobby" : p));
+    if (payload.status === "WAITING") setPhase((current) => (current === "connecting" ? "lobby" : current));
+  });
+
+  useSocketEvent<{ seconds: number }>(ServerEvents.gameCountdown, (payload) => {
+    setPhase("lobby");
+    setCountdown(payload.seconds);
+    sound.play("heartbeat");
   });
 
   useSocketEvent<PublicQuestion>(ServerEvents.gameQuestion, (payload) => {
@@ -88,38 +102,59 @@ export function PlayPage() {
     setResults(null);
     setAck(null);
     setAnswered(false);
+    setSubmitted(null);
+    setCountdown(null);
     setPhase("question");
+    sound.play("blip");
   });
 
   useSocketEvent<AnswerAckPayload>(ServerEvents.answerAck, (payload) => {
     setAck(payload);
     setAnswered(true);
+    sound.play("submit");
   });
 
   useSocketEvent<ResultsPayload>(ServerEvents.gameResults, (payload) => {
     setResults(payload);
     setLeaderboard(payload.leaderboard);
     setPhase("results");
+    if (ack?.isCorrect) sound.play("correct");
+    else sound.play("wrong");
   });
 
   useSocketEvent<LeaderboardEntry[]>(ServerEvents.gameLeaderboard, (payload) => setLeaderboard(payload));
 
   useSocketEvent<GameEndedPayload>(ServerEvents.gameEnded, (payload) => {
     setEnded(payload);
+    setLeaderboard(payload.leaderboard as any);
     setPhase("ended");
+    sound.stopMusic();
   });
 
-  useSocketEvent<{ questionId: string; answeredCount: number; playerCount: number }>(
-    ServerEvents.gameAnswerCount,
-    () => {
-      /* the player already knows they answered; counts are for the host view */
-    },
-  );
+  // Local tick for the pre-question countdown.
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => setCountdown((value) => (value === null ? null : value - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  useEffect(() => {
+    if (countdown !== null && countdown > 0) sound.startMusic("lobby");
+  }, [countdown]);
 
   const submit = useCallback(
     (answer: AnswerSubmission) => {
       if (!question) return;
       setAnswered(true); // optimistic; server ack confirms
+      setSubmitted({
+        ...(answer.chosenIndex !== undefined ? { slot: answer.chosenIndex } : {}),
+        ...(answer.chosenText ? { text: answer.chosenText } : {}),
+        ...(answer.chosenIndices ? { slot: answer.chosenIndices[0] } : {}),
+      });
       socket.emit(ClientEvents.playerAnswer, { questionId: question.questionId, ...answer });
     },
     [question, socket],
@@ -128,82 +163,130 @@ export function PlayPage() {
   if (!record) return <Navigate to="/live/join" replace />;
 
   const myRank = ended?.leaderboard.find((entry) => entry.playerId === record.playerId);
+  const correct = ack?.isCorrect === true;
 
   return (
-    <div className="live-screen min-h-screen px-4 py-6">
-      <header className="mx-auto flex max-w-2xl items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="live-screen flex h-[100dvh] flex-col overflow-hidden px-4 py-4">
+      <LiveBackground />
+
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Avatar avatar={record.avatar} />
-          <div>
-            <p className="font-semibold text-white">{record.username}</p>
-            <p className="text-xs text-white/50">{state?.quizTitle ?? "Sesión en vivo"}</p>
+          <div className="min-w-0">
+            <p className="truncate font-bold text-white">{record.username}</p>
+            <p className="truncate text-xs text-white/50">{state?.quizTitle ?? "Sesión en vivo"}</p>
           </div>
         </div>
-        {ack && (
-          <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold text-white">
-            {ack.totalScore} pts
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {ack && (
+            <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-bold tabular-nums text-white">
+              {ack.totalScore} pts
+            </span>
+          )}
+          <SoundControls compact />
+        </div>
       </header>
 
       {error && (
-        <p className="mx-auto mt-4 max-w-2xl rounded-xl bg-red-500/20 px-4 py-3 text-sm text-red-100">{error}</p>
+        <p className="relative z-10 mt-3 shrink-0 rounded-xl bg-red-500/25 px-4 py-2 text-sm text-red-100">{error}</p>
       )}
 
-      <main className="mx-auto mt-8 max-w-2xl space-y-6">
-        {phase === "connecting" && <p className="text-center text-white/70">Conectando…</p>}
+      <main className="relative z-10 mt-4 flex min-h-0 flex-1 flex-col">
+        {phase === "connecting" && (
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-white/70">Conectando…</p>
+          </div>
+        )}
 
         {phase === "lobby" && (
-          <div className="rounded-3xl bg-white/10 p-8 text-center">
-            <p className="text-4xl">⏳</p>
-            <p className="mt-3 text-lg font-semibold text-white">¡Estás dentro!</p>
-            <p className="text-sm text-white/60">Esperando a que el anfitrión inicie la partida…</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+            {countdown !== null && countdown > 0 ? (
+              <>
+                <span key={countdown} className="drop-in text-[8rem] font-black leading-none text-white">
+                  {countdown}
+                </span>
+                <p className="text-lg font-bold text-white/80">¡Preparados!</p>
+              </>
+            ) : (
+              <>
+                <span className="text-5xl">⏳</span>
+                <p className="text-2xl font-black text-white">¡Estás dentro!</p>
+                <p className="max-w-xs text-sm text-white/60">
+                  Mira la pantalla del anfitrión. La partida empezará en breve.
+                </p>
+                <div className="mt-2 rounded-2xl bg-black/25 px-6 py-3 backdrop-blur">
+                  <p className="text-xs uppercase tracking-widest text-white/50">PIN</p>
+                  <p className="text-3xl font-black tracking-[0.3em] text-white">{record.pin}</p>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {(phase === "question" || phase === "results") && question && (
           <>
-            <div className="rounded-3xl bg-white/10 p-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/50">
-                Pregunta {question.index + 1} / {question.total}
-              </p>
-              <h1 className="mt-1 text-xl font-bold text-white">{question.text}</h1>
-              {phase === "question" && (
-                <p className="mt-1 text-sm text-white/60 tabular-nums">{remaining}s</p>
-              )}
+            <div className="shrink-0 rounded-2xl bg-black/25 px-4 py-3 backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-white/60">
+                  Pregunta {question.index + 1} / {question.total}
+                </p>
+                {phase === "question" && (
+                  <span className={`text-sm font-black tabular-nums ${remaining <= 5 ? "text-red-300" : "text-white/70"}`}>
+                    {remaining}s
+                  </span>
+                )}
+              </div>
+              <h1 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">{question.text}</h1>
             </div>
-            <QuestionPanel question={question} answered={answered} onSubmit={submit} />
+
+            <div className="mt-3 min-h-0 flex-1">
+              <QuestionPanel question={question} answered={answered} onSubmit={submit} submitted={submitted} />
+            </div>
           </>
         )}
 
         {phase === "results" && results && (
-          <div className="space-y-4">
+          <div className="pop-in mt-3 min-h-0 flex-1 overflow-y-auto">
             <div
-              className={`rounded-2xl px-5 py-4 text-center text-lg font-bold ${
-                results.type === "open_text" || results.type === "closest_to"
-                  ? "bg-emerald-500/20 text-emerald-100"
-                  : "bg-white/10 text-white"
+              className={`flex flex-col items-center gap-2 rounded-3xl px-5 py-6 text-center ${
+                correct ? "bg-emerald-500" : "bg-rose-600"
               }`}
             >
-              {ack?.isCorrect ? "✅ ¡Correcto!" : "❌ Incorrecto"}
-              {ack && <span className="ml-2 text-sm font-medium text-white/70">+{ack.score} pts</span>}
+              <span className="text-5xl">{correct ? "✅" : "❌"}</span>
+              <p className="text-2xl font-black text-white">{correct ? "¡Correcto!" : "Incorrecto"}</p>
+              {ack && (
+                <p className="text-sm font-bold text-white/80">
+                  +{ack.score} pts · total {ack.totalScore}
+                </p>
+              )}
+              {!correct && results.correctDisplayIndices.length > 0 && (
+                <div className="mt-1 flex items-center gap-2 text-sm text-white/90">
+                  <span>Respuesta correcta:</span>
+                  {results.correctDisplayIndices.map((slot) => (
+                    <AnswerShape key={slot} shape={paletteFor(slot).shape} className="h-4 w-4" />
+                  ))}
+                </div>
+              )}
+              {results.explanation && <p className="mt-1 text-xs text-white/80">{results.explanation}</p>}
             </div>
-            <section className="rounded-2xl bg-white/10 p-4">
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/60">Clasificación</h2>
-              <Leaderboard entries={leaderboard} highlightPlayerId={record.playerId} />
+
+            <section className="mt-4 rounded-2xl bg-black/25 p-4 backdrop-blur">
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-widest text-white/60">Clasificación</h2>
+              <Leaderboard entries={leaderboard} highlightPlayerId={record.playerId} maxRows={6} />
             </section>
           </div>
         )}
 
         {phase === "ended" && (
-          <div className="rounded-3xl bg-white/10 p-6 text-center">
-            <p className="text-5xl">{myRank?.rank === 1 ? "🏆" : "🎉"}</p>
-            <p className="mt-3 text-xl font-bold text-white">¡Has quedado #{myRank?.rank ?? "—"}!</p>
-            <p className="text-sm text-white/60">
+          <div className="relative flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto text-center">
+            <Confetti pieces={60} />
+            <span className="text-6xl">{myRank?.rank === 1 ? "🏆" : "🎉"}</span>
+            <p className="text-3xl font-black text-white">¡Has quedado #{myRank?.rank ?? "—"}!</p>
+            <p className="text-lg font-bold text-white/80">
               {myRank?.score ?? 0} puntos · {myRank?.correctAnswers ?? 0}/{myRank?.totalAnswers ?? 0} correctas
             </p>
-            <div className="mt-6 text-left">
-              <Leaderboard entries={ended?.leaderboard ?? []} highlightPlayerId={record.playerId} />
+            <div className="mt-2 w-full rounded-2xl bg-black/25 p-4 text-left backdrop-blur">
+              <Leaderboard entries={ended?.leaderboard ?? []} highlightPlayerId={record.playerId} maxRows={10} />
             </div>
           </div>
         )}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { createHealthModule } from "../modules/health/health.module.ts";
 import { createSystemModule } from "../modules/system/system.module.ts";
+import { createMediaModule } from "../modules/media/media.module.ts";
 import { createLiveSessionModule } from "../modules/live-sessions/live-sessions.module.ts";
 import type { AppDependencies } from "./dependencies.ts";
 
@@ -30,8 +31,11 @@ export function createApiRouter(deps: AppDependencies): Router {
     publisher: deps.publisher,
   });
 
+  const media = createMediaModule({ logger: deps.logger });
+
   router.use(health.router);
   router.use("/system", system.router);
+  router.use("/media", media.router);
   router.use("/live", live.router);
 
   return router;

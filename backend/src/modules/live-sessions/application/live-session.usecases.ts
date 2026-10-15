@@ -2,10 +2,21 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { ForbiddenError, NotFoundError } from "../../../shared/errors/app-error.ts";
 import { parseOrThrow } from "../../../shared/middleware/validate.ts";
-import { newNumericCode } from "../../../shared/utils/id.ts";
+import { isUuid, newNumericCode } from "../../../shared/utils/id.ts";
 import { QUESTION_TYPES } from "../domain/types.ts";
-import type { QuizSummary } from "../domain/types.ts";
-import type { LiveSessionStore } from "./ports.ts";
+import type { QuizDetail, QuizSummary } from "../domain/types.ts";
+import type { LiveSessionStore, NewQuestionInput } from "./ports.ts";
+
+/**
+ * Accepts either an external http(s) URL or a deployment-relative media path
+ * (`/api/v1/media/<id>`) produced by the media module.
+ */
+const mediaUrlSchema = z
+  .string()
+  .max(1000)
+  .refine((value) => /^https?:\/\//i.test(value) || value.startsWith("/"), {
+    message: "Must be an http(s) URL or an absolute path",
+  });
 
 const questionSchema = z
   .object({
@@ -19,7 +30,8 @@ const questionSchema = z
     rangeMax: z.number().int().nullish(),
     correctNumber: z.number().int().nullish(),
     explanation: z.string().max(1000).nullish(),
-    imageUrl: z.string().url().nullish(),
+    imageUrl: mediaUrlSchema.nullish(),
+    optionImages: z.array(mediaUrlSchema.nullable()).max(10).nullish(),
     baseScore: z.number().int().min(0).max(5000).default(500),
     timeSec: z.number().int().min(5).max(120).default(20),
   })
@@ -44,7 +56,32 @@ export const createQuizSchema = z.object({
   questions: z.array(questionSchema).min(1).max(100),
 });
 
+/** Updating a quiz replaces its questionnaire; the shape is identical. */
+export const updateQuizSchema = createQuizSchema;
+
 export type CreateQuizInput = z.input<typeof createQuizSchema>;
+
+type ParsedQuestion = z.infer<typeof questionSchema>;
+
+/** Normalise a validated question into the store's input shape. */
+function toNewQuestions(questions: ParsedQuestion[]): NewQuestionInput[] {
+  return questions.map((q) => ({
+    type: q.type,
+    text: q.text,
+    options: q.options,
+    correctIndex: q.correctIndex ?? null,
+    correctIndices: q.correctIndices ?? null,
+    correctText: q.correctText ?? null,
+    rangeMin: q.rangeMin ?? null,
+    rangeMax: q.rangeMax ?? null,
+    correctNumber: q.correctNumber ?? null,
+    explanation: q.explanation ?? null,
+    imageUrl: q.imageUrl ?? null,
+    optionImages: q.optionImages ?? null,
+    baseScore: q.baseScore,
+    timeSec: q.timeSec,
+  }));
+}
 
 /** Use case: create a quiz with its questions. */
 export class CreateQuizUseCase {
@@ -56,22 +93,38 @@ export class CreateQuizUseCase {
       title: data.title,
       description: data.description ?? null,
       tenantId: data.tenantId ?? null,
-      questions: data.questions.map((q) => ({
-        type: q.type,
-        text: q.text,
-        options: q.options,
-        correctIndex: q.correctIndex ?? null,
-        correctIndices: q.correctIndices ?? null,
-        correctText: q.correctText ?? null,
-        rangeMin: q.rangeMin ?? null,
-        rangeMax: q.rangeMax ?? null,
-        correctNumber: q.correctNumber ?? null,
-        explanation: q.explanation ?? null,
-        imageUrl: q.imageUrl ?? null,
-        baseScore: q.baseScore,
-        timeSec: q.timeSec,
-      })),
+      questions: toNewQuestions(data.questions),
     });
+  }
+}
+
+/** Use case: read a quiz with its full questionnaire (authoring editor). */
+export class GetQuizDetailUseCase {
+  constructor(private readonly store: LiveSessionStore) {}
+
+  async execute(quizId: string): Promise<QuizDetail> {
+    if (!isUuid(quizId)) throw new NotFoundError("Quiz not found");
+    const quiz = await this.store.getQuizDetail(quizId);
+    if (!quiz) throw new NotFoundError("Quiz not found");
+    return quiz;
+  }
+}
+
+/** Use case: replace a quiz's metadata and questionnaire. */
+export class UpdateQuizUseCase {
+  constructor(private readonly store: LiveSessionStore) {}
+
+  async execute(quizId: string, input: unknown): Promise<{ id: string; questionCount: number }> {
+    if (!isUuid(quizId)) throw new NotFoundError("Quiz not found");
+    const data = parseOrThrow(updateQuizSchema, input);
+    const updated = await this.store.updateQuiz(quizId, {
+      title: data.title,
+      description: data.description ?? null,
+      tenantId: data.tenantId ?? null,
+      questions: toNewQuestions(data.questions),
+    });
+    if (!updated) throw new NotFoundError("Quiz not found");
+    return updated;
   }
 }
 
