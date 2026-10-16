@@ -13,6 +13,7 @@ import { ClientEvents, ServerEvents } from "../lib/protocol";
 import type {
   AnswerCountPayload,
   GameEndedPayload,
+  PlayerJoinedPayload,
   PublicQuestion,
   ResultsPayload,
   SessionStatePayload,
@@ -62,6 +63,23 @@ export function PresentPage() {
     setEnded(null);
     setQuestion(null);
     setResults(null);
+    setState((current) => current ? { ...current, status: "ACTIVE" } : current);
+  });
+
+  useSocketEvent<PlayerJoinedPayload>(ServerEvents.playerJoined, (player) => {
+    setState((current) => {
+      if (!current) return current;
+      const players = current.players.filter((item) => item.playerId !== player.playerId);
+      players.push(player);
+      return { ...current, players };
+    });
+  });
+
+  useSocketEvent<{ playerId: string }>(ServerEvents.playerLeft, ({ playerId }) => {
+    setState((current) => current ? {
+      ...current,
+      players: current.players.map((player) => player.playerId === playerId ? { ...player, connected: false } : player),
+    } : current);
   });
 
   useSocketEvent<{ seconds: number }>(ServerEvents.gameCountdown, (payload) => {
@@ -74,6 +92,7 @@ export function PresentPage() {
     setResults(null);
     setAnsweredCount(0);
     setCountdown(null);
+    setState((current) => current ? { ...current, status: "ACTIVE", questionIndex: payload.index } : current);
     sound.play("submit");
   });
 
@@ -88,6 +107,8 @@ export function PresentPage() {
 
   useSocketEvent<GameEndedPayload>(ServerEvents.gameEnded, (payload) => {
     setEnded(payload);
+    setCountdown(null);
+    setState((current) => current ? { ...current, status: "FINISHED" } : current);
     sound.stopMusic();
     sound.play("fanfare");
   });

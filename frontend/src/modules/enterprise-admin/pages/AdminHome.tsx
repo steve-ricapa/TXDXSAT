@@ -2,23 +2,18 @@ import { useEffect, useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
-  ArrowRight,
-  Award,
   Building2,
   CheckCircle2,
-  ChevronDown,
-  HelpCircle,
   Pencil,
   Radio,
   Search,
   ShieldAlert,
   ShieldCheck,
-  TrendingDown,
   TrendingUp,
   Users,
   XCircle,
 } from "lucide-react";
-import { Badge, Button, Card, LoadingState, ProgressBar, StatCard } from "@/components/ui";
+import { Badge, LoadingState, StatCard } from "@/components/ui";
 import { useAuth } from "@/modules/auth/context/AuthContext";
 import {
   tenantsApi,
@@ -41,6 +36,7 @@ export function AdminHome() {
   const [activeTab, setActiveTab] = useState<"collaborators" | "quizzes">("collaborators");
   const [searchEmployee, setSearchEmployee] = useState("");
   const [selectedQuizId, setSelectedQuizId] = useState<string>("");
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
 
   // 1. Load accessible tenants list
   useEffect(() => {
@@ -85,6 +81,7 @@ export function AdminHome() {
         setAnalytics(data);
         if (data.quizzes.length > 0) {
           setSelectedQuizId(data.quizzes[0].id);
+          setSelectedSessionId(data.quizzes[0].sessions[0]?.id ?? "");
         }
       })
       .catch((err) => {
@@ -114,6 +111,11 @@ export function AdminHome() {
     if (!analytics || !selectedQuizId) return null;
     return analytics.quizzes.find((q) => q.id === selectedQuizId) || analytics.quizzes[0] || null;
   }, [analytics, selectedQuizId]);
+
+  const currentSession = currentQuiz?.sessions.find((session) => session.id === selectedSessionId)
+    ?? currentQuiz?.sessions[0]
+    ?? null;
+  const questionsInView = currentSession?.questionsBreakdown ?? currentQuiz?.questionsBreakdown ?? [];
 
   const tenantName = analytics?.tenant.name || tenants.find((t) => t.id === selectedTenantId)?.name || "Tu Organización";
 
@@ -180,7 +182,7 @@ export function AdminHome() {
               value={`${analytics.summary.overallAccuracy}%`}
               hint={analytics.summary.overallAccuracy >= 75 ? "Nivel de resiliencia alto" : "Requiere refuerzo en temas clave"}
               icon={<ShieldCheck className="h-4 w-4" />}
-              tone={analytics.summary.overallAccuracy >= 75 ? "success" : analytics.summary.overallAccuracy >= 50 ? "warning" : "danger"}
+              tone={analytics.summary.overallAccuracy >= 75 ? "success" : "warning"}
             />
             <StatCard
               label="Colaboradores Evaluados"
@@ -200,7 +202,7 @@ export function AdminHome() {
               value={String(analytics.summary.atRiskCount)}
               hint={analytics.summary.atRiskCount > 0 ? "Tasa de error superior al 40%" : "Sin colaboradores críticos"}
               icon={<ShieldAlert className="h-4 w-4" />}
-              tone={analytics.summary.atRiskCount > 0 ? "danger" : "success"}
+              tone={analytics.summary.atRiskCount > 0 ? "warning" : "success"}
             />
           </section>
 
@@ -212,24 +214,32 @@ export function AdminHome() {
               </span>
               <div>
                 <p className="text-sm font-bold text-ink">Evaluaciones en Tiempo Real</p>
-                <p className="text-xs text-ink-muted">Inicia una sesión para generar el PIN de acceso inmediato para tus colaboradores.</p>
+                <p className="text-xs text-ink-muted">
+                  {isSuperadmin
+                    ? "Inicia una sesión para generar el PIN de acceso inmediato para los colaboradores."
+                    : "Consulta el desempeño y los resultados de las sesiones de tu organización."}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2.5">
-              <Link
-                to="/live/host"
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-xs font-bold text-[#04211f] shadow-sm transition hover:bg-[var(--color-accent-hover)]"
-              >
-                <Radio className="h-4 w-4" />
-                Lanzar Sesión en Vivo
-              </Link>
-              <Link
-                to="/live/editor"
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
-              >
-                <Pencil className="h-4 w-4" />
-                Editor de Quizzes
-              </Link>
+              {isSuperadmin && (
+                <>
+                  <Link
+                    to="/live/host"
+                    className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-xs font-bold text-[#04211f] shadow-sm transition hover:bg-[var(--color-accent-hover)]"
+                  >
+                    <Radio className="h-4 w-4" />
+                    Lanzar Sesión en Vivo
+                  </Link>
+                  <Link
+                    to="/live/editor"
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editor de Quizzes
+                  </Link>
+                </>
+              )}
             </div>
           </section>
 
@@ -450,7 +460,12 @@ export function AdminHome() {
                     <select
                       id="quiz-select"
                       value={selectedQuizId}
-                      onChange={(e) => setSelectedQuizId(e.target.value)}
+                      onChange={(e) => {
+                        const quizId = e.target.value;
+                        const quiz = analytics.quizzes.find((item) => item.id === quizId);
+                        setSelectedQuizId(quizId);
+                        setSelectedSessionId(quiz?.sessions[0]?.id ?? "");
+                      }}
                       className="mt-0.5 bg-transparent text-base font-bold text-ink focus:outline-none cursor-pointer"
                     >
                       {analytics.quizzes.map((q) => (
@@ -461,6 +476,28 @@ export function AdminHome() {
                     </select>
                   </div>
                 </div>
+
+                {currentQuiz && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-accent">Sesión específica</p>
+                    <label htmlFor="session-select" className="sr-only">Seleccionar sesión</label>
+                    <select
+                      id="session-select"
+                      value={currentSession?.id ?? ""}
+                      onChange={(e) => setSelectedSessionId(e.target.value)}
+                      disabled={currentQuiz.sessions.length === 0}
+                      className="mt-1 max-w-xs bg-transparent text-sm font-semibold text-ink focus:outline-none cursor-pointer disabled:text-ink-muted"
+                    >
+                      {currentQuiz.sessions.length === 0 ? (
+                        <option value="">Sin sesiones finalizadas</option>
+                      ) : currentQuiz.sessions.map((session, index) => (
+                        <option key={session.id} value={session.id} className="bg-surface text-ink">
+                          Sesión {index + 1} · {session.finishedAt ? new Date(session.finishedAt).toLocaleString("es") : "fecha no disponible"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {currentQuiz && (
                   <div className="flex items-center gap-4 text-xs">
@@ -481,9 +518,40 @@ export function AdminHome() {
               {/* Questions Failure Analysis */}
               {currentQuiz && (
                 <div className="space-y-4">
+                  {currentSession && (
+                    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                      <div className="border-b border-border px-5 py-4">
+                        <h3 className="font-bold text-ink">Resultados de esta sesión</h3>
+                        <p className="text-xs text-ink-muted">Participantes con más respuestas incorrectas aparecen primero.</p>
+                      </div>
+                      {currentSession.employees.length === 0 ? (
+                        <p className="p-5 text-sm text-ink-muted">No hay respuestas registradas para esta sesión.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-surface-raised text-xs uppercase tracking-wider text-ink-muted">
+                              <tr><th className="px-5 py-3">Colaborador</th><th className="px-5 py-3">Aciertos</th><th className="px-5 py-3">Fallos</th><th className="px-5 py-3">Puntaje</th><th className="px-5 py-3">Precisión</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {currentSession.employees.map((employee) => (
+                                <tr key={`${employee.userId ?? employee.name}`}>
+                                  <td className="px-5 py-3 font-medium text-ink">{employee.name}</td>
+                                  <td className="px-5 py-3 text-emerald-400">{employee.correctAnswers}</td>
+                                  <td className="px-5 py-3 text-red-400">{employee.incorrectAnswers}</td>
+                                  <td className="px-5 py-3 text-ink">{employee.score}</td>
+                                  <td className="px-5 py-3 text-ink">{employee.accuracyRate}%</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-bold text-ink">
-                      Análisis de Aciertos y Fallos por Pregunta
+                      {currentSession ? "Preguntas más falladas en esta sesión" : "Análisis de Aciertos y Fallos por Pregunta"}
                     </h3>
                     <span className="text-xs text-ink-muted">
                       Identifica en qué conceptos concretos está tropezando el equipo
@@ -491,7 +559,7 @@ export function AdminHome() {
                   </div>
 
                   <div className="grid gap-4">
-                    {currentQuiz.questionsBreakdown.map((q, idx) => {
+                    {questionsInView.map((q, idx) => {
                       const isCriticalFailure = q.accuracyRate < 50;
 
                       return (

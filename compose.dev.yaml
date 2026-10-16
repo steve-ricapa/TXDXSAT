@@ -57,6 +57,7 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@txdxsat.local}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-change-me-superadmin}
       SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
     volumes:
       # Hot reload: source and Prisma schema are mounted over the image copy.
       - ./backend/src:/app/src
@@ -72,7 +73,8 @@ services:
     networks:
       - dev
     command: >
-      sh -c "./node_modules/.bin/prisma migrate deploy &&
+      sh -c "./node_modules/.bin/prisma generate &&
+             ./node_modules/.bin/prisma migrate deploy &&
              npm run dev"
 
   frontend:

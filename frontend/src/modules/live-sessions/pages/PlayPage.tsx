@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { getSocket } from "@/services/socket";
 import { useAuth } from "@/modules/auth/context/AuthContext";
 import { getToken } from "@/modules/auth/lib/auth-store";
@@ -25,6 +25,7 @@ import type {
 } from "../lib/protocol";
 import { sound } from "../lib/sound";
 import { playerStore, type StoredPlayer } from "../lib/storage";
+import { liveErrorMessage } from "../lib/error-message";
 
 type Phase = "connecting" | "lobby" | "question" | "results" | "ended";
 
@@ -32,6 +33,7 @@ type Phase = "connecting" | "lobby" | "question" | "results" | "ended";
 export function PlayPage() {
   const { user } = useAuth();
   const { sessionId = "" } = useParams();
+  const navigate = useNavigate();
   const stored = playerStore.load(sessionId);
   const owned = stored?.userId === user?.id ? stored : null;
   const socket = getSocket();
@@ -41,6 +43,7 @@ export function PlayPage() {
   const [error, setError] = useState<string | null>(null);
   const [question, setQuestion] = useState<PublicQuestion | null>(null);
   const [answered, setAnswered] = useState(false);
+  const [answerPending, setAnswerPending] = useState(false);
   const [submitted, setSubmitted] = useState<{ slot?: number; text?: string } | null>(null);
   const [ack, setAck] = useState<AnswerAckPayload | null>(null);
   const [results, setResults] = useState<ResultsPayload | null>(null);
@@ -49,6 +52,7 @@ export function PlayPage() {
   const [state, setState] = useState<SessionStatePayload | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const joinedRef = useRef(false);
+  const answerPendingRef = useRef(false);
   const remaining = useCountdown(question?.endsAt ?? null);
 
   // (Re)join on mount using the persisted playerId.
@@ -72,11 +76,31 @@ export function PlayPage() {
       );
       setPhase((current) => (current === "connecting" ? "lobby" : current));
     };
-    const onError = (payload: { message?: string }) => setError(payload?.message ?? "Error");
+    const onError = (payload: { message?: string }) => {
+      if (payload?.message === "This session has already finished") return;
+      setError(liveErrorMessage(payload?.message));
+    };
+    const onPlayerError = (payload: { event?: string; message?: string }) => {
+      if (payload?.message === "This session has already finished") return;
+      if (payload.event === ClientEvents.playerAnswer) {
+        answerPendingRef.current = false;
+        setAnswerPending(false);
+        if (payload.message === "You already answered this question") {
+          setError(null);
+          setAnswered(true);
+        } else {
+          setError(liveErrorMessage(payload?.message));
+          setAnswered(false);
+          setSubmitted(null);
+        }
+      } else {
+        setError(liveErrorMessage(payload?.message));
+      }
+    };
 
     socket.on(ServerEvents.playerJoinedAck, onJoined);
     socket.on(ServerEvents.error, onError);
-    socket.on(ServerEvents.playerError, onError);
+    socket.on(ServerEvents.playerError, onPlayerError);
     const rejoin = () => socket.emit(ClientEvents.playerJoin, {
       pin: record.pin,
       username: record.username,
@@ -91,7 +115,7 @@ export function PlayPage() {
       joinedRef.current = false;
       socket.off(ServerEvents.playerJoinedAck, onJoined);
       socket.off(ServerEvents.error, onError);
-      socket.off(ServerEvents.playerError, onError);
+      socket.off(ServerEvents.playerError, onPlayerError);
       socket.off("connect", rejoin);
     };
   }, [record, socket, user?.id]);
@@ -108,9 +132,12 @@ export function PlayPage() {
   });
 
   useSocketEvent<PublicQuestion>(ServerEvents.gameQuestion, (payload) => {
+    setError(null);
     setQuestion(payload);
     setResults(null);
     setAck(null);
+    answerPendingRef.current = false;
+    setAnswerPending(false);
     setAnswered(false);
     setSubmitted(null);
     setCountdown(null);
@@ -119,6 +146,9 @@ export function PlayPage() {
   });
 
   useSocketEvent<AnswerAckPayload>(ServerEvents.answerAck, (payload) => {
+    if (question && payload.questionId !== question.questionId) return;
+    answerPendingRef.current = false;
+    setAnswerPending(false);
     setAck(payload);
     setAnswered(true);
     sound.play("submit");
@@ -135,6 +165,7 @@ export function PlayPage() {
   useSocketEvent<LeaderboardEntry[]>(ServerEvents.gameLeaderboard, (payload) => setLeaderboard(payload));
 
   useSocketEvent<GameEndedPayload>(ServerEvents.gameEnded, (payload) => {
+    setError(null);
     setEnded(payload);
     setLeaderboard(payload.leaderboard as any);
     setPhase("ended");
@@ -158,16 +189,18 @@ export function PlayPage() {
 
   const submit = useCallback(
     (answer: AnswerSubmission) => {
-      if (!question) return;
-      setAnswered(true); // optimistic; server ack confirms
+      if (!question || answered || answerPendingRef.current) return;
+      answerPendingRef.current = true;
+      setAnswerPending(true);
       setSubmitted({
         ...(answer.chosenIndex !== undefined ? { slot: answer.chosenIndex } : {}),
         ...(answer.chosenText ? { text: answer.chosenText } : {}),
         ...(answer.chosenIndices ? { slot: answer.chosenIndices[0] } : {}),
+        ...(answer.chosenIndices ? { slots: answer.chosenIndices } : {}),
       });
       socket.emit(ClientEvents.playerAnswer, { questionId: question.questionId, ...answer });
     },
-    [question, socket],
+    [answered, question, socket],
   );
 
   if (!record || record.userId !== user?.id) return <Navigate to={stored?.pin ? `/live/join?pin=${stored.pin}` : "/live/join"} replace />;
@@ -177,7 +210,7 @@ export function PlayPage() {
 
   return (
     <div className="live-screen flex h-[100dvh] flex-col overflow-hidden px-4 py-4">
-      <LiveBackground />
+      {(phase === "connecting" || phase === "lobby" || phase === "question") && <LiveBackground />}
 
       <header className="relative z-10 flex shrink-0 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -198,7 +231,7 @@ export function PlayPage() {
       </header>
 
       {error && (
-        <p className="relative z-10 mt-3 shrink-0 rounded-xl bg-danger/15 px-4 py-2 text-sm text-danger-readable">{error}</p>
+        <p role="alert" className="relative z-10 mx-auto mt-3 max-w-xl shrink-0 border-l-2 border-danger bg-danger/5 px-3 py-2 text-xs leading-relaxed text-danger-readable">{error}</p>
       )}
 
       <main className="relative z-10 mt-4 flex min-h-0 flex-1 flex-col">
@@ -249,14 +282,20 @@ export function PlayPage() {
               <h1 className="mt-1 text-lg font-black leading-tight text-ink sm:text-xl">{question.text}</h1>
             </div>
 
-            <div className="mt-3 min-h-0 flex-1">
-              <QuestionPanel question={question} answered={answered} onSubmit={submit} submitted={submitted} />
-            </div>
+            {phase === "question" && <div className="mt-3 min-h-0 flex-1">
+              <QuestionPanel
+                question={question}
+                answered={answered}
+                submitting={answerPending}
+                onSubmit={submit}
+                submitted={submitted}
+              />
+            </div>}
           </>
         )}
 
         {phase === "results" && results && (
-          <div className="pop-in mt-3 min-h-0 flex-1 overflow-y-auto">
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
             <div
               className={`flex flex-col items-center gap-2 rounded-3xl px-5 py-6 text-center ${
                 correct ? "bg-success text-[#04200f]" : "bg-danger text-white"
@@ -294,15 +333,66 @@ export function PlayPage() {
         )}
 
         {phase === "ended" && (
-          <div className="relative flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto text-center">
-            <Confetti pieces={60} />
-            <span className="text-6xl">{myRank?.rank === 1 ? "🏆" : "🎉"}</span>
-            <p className="text-3xl font-black text-ink">¡Has quedado #{myRank?.rank ?? "—"}!</p>
-            <p className="text-lg font-bold text-ink-muted">
-              {myRank?.score ?? 0} puntos · {myRank?.correctAnswers ?? 0}/{myRank?.totalAnswers ?? 0} correctas
-            </p>
-            <div className="game-panel mt-2 w-full rounded-2xl p-4 text-left">
-              <Leaderboard entries={ended?.leaderboard ?? []} highlightPlayerId={record.playerId} maxRows={10} />
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-6 text-center">
+            <Confetti fixed pieces={80} />
+            <div className="my-auto flex w-full max-w-md flex-col items-center gap-5">
+              {/* Tarjeta personal de honor al estilo Kahoot */}
+              <div className="flex flex-col items-center gap-3">
+                <span className="drop-in text-6xl">
+                  {myRank?.rank === 1 ? "🥇" : myRank?.rank === 2 ? "🥈" : myRank?.rank === 3 ? "🥉" : "🎯"}
+                </span>
+
+                <div className={myRank?.rank && myRank.rank <= 3 ? "pulse-ring rounded-full" : ""}>
+                  <Avatar avatar={record.avatar} size="lg" ring />
+                </div>
+
+                <div>
+                  <h2 className="text-3xl font-black text-ink">
+                    {myRank?.rank === 1
+                      ? "¡Eres el campeón!"
+                      : myRank?.rank && myRank.rank <= 3
+                      ? `¡Has quedado #${myRank.rank}!`
+                      : `¡Puesto #${myRank?.rank ?? "—"}!`}
+                  </h2>
+                  <p className="mt-0.5 text-sm font-semibold text-ink-muted">{record.username}</p>
+                </div>
+
+                {/* Métricas destacadas con chips */}
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <span className="game-chip rounded-xl px-3.5 py-1.5 text-sm font-black text-warning">
+                    ⚡ {myRank?.score ?? 0} pts
+                  </span>
+                  <span className="game-chip rounded-xl px-3.5 py-1.5 text-sm font-bold text-ink-muted">
+                    🎯 {myRank?.correctAnswers ?? 0}/{myRank?.totalAnswers ?? 0} correctas
+                  </span>
+                </div>
+              </div>
+
+              {/* Clasificación final contenida */}
+              <div className="game-panel w-full rounded-2xl p-4 text-left shadow-lg">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-ink-muted">
+                    Clasificación final
+                  </h3>
+                  <span className="text-xs font-semibold text-ink-soft">
+                    {ended?.leaderboard.length ?? 0} {ended?.leaderboard.length === 1 ? "jugador" : "jugadores"}
+                  </span>
+                </div>
+                <Leaderboard
+                  entries={ended?.leaderboard ?? []}
+                  highlightPlayerId={record.playerId}
+                  maxRows={8}
+                />
+              </div>
+
+              {/* Botón de volver */}
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                className="w-full rounded-xl bg-accent px-6 py-3.5 font-bold text-[#04211f] shadow-lg shadow-accent/20 transition hover:scale-[1.02] hover:brightness-110 active:scale-95"
+              >
+                Volver al panel
+              </button>
             </div>
           </div>
         )}

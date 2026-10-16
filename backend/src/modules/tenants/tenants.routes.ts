@@ -87,8 +87,8 @@ export function createTenantsRouter(): Router {
     const user = currentUser(req);
     const tenantId = String(req.params.id);
 
-    // Authorization check: Superadmin or Admin of this tenant
-    if (user.role !== "SUPERADMIN" && user.tenantId !== tenantId) {
+    // Only the platform superadmin or this tenant's admin can view analytics.
+    if (user.role !== "SUPERADMIN" && (user.role !== "ADMIN" || user.tenantId !== tenantId)) {
       throw new ForbiddenError("No tienes permisos para ver las métricas de esta organización");
     }
 
@@ -218,6 +218,55 @@ export function createTenantsRouter(): Router {
         };
       });
 
+      const sessionAnalytics = quizSessions.map((session) => {
+        const sessionPlayers = players.filter((p) => p.sessionId === session.id);
+        const sessionAnswers = answers.filter((a) => a.sessionId === session.id);
+        const sessionQuestions = quizQuestions.filter((q) =>
+          sessionAnswers.some((answer) => answer.questionId === q.id),
+        ).map((q) => {
+          const questionAnswers = sessionAnswers.filter((a) => a.questionId === q.id);
+          const correctAttempts = questionAnswers.filter((a) => a.isCorrect).length;
+          const totalAttempts = questionAnswers.length;
+          const accuracy = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
+          return {
+            questionId: q.id,
+            orderIndex: q.orderIndex,
+            text: q.text,
+            type: q.type,
+            explanation: q.explanation,
+            totalAttempts,
+            correctAttempts,
+            accuracyRate: accuracy,
+            failRate: 100 - accuracy,
+            difficulty: accuracy < 50 ? ("Alta" as const) : accuracy < 75 ? ("Media" as const) : ("Baja" as const),
+          };
+        });
+        const sessionEmployees = sessionPlayers.map((player) => {
+          const playerAnswers = sessionAnswers.filter((a) => a.playerId === player.id);
+          const correctAnswers = playerAnswers.filter((a) => a.isCorrect).length;
+          const totalAnswers = playerAnswers.length;
+          return {
+            userId: player.userId,
+            name: employees.find((employee) => employee.id === player.userId)?.name ?? player.username,
+            score: player.score,
+            totalAnswers,
+            correctAnswers,
+            incorrectAnswers: totalAnswers - correctAnswers,
+            accuracyRate: totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0,
+          };
+        }).sort((a, b) => b.incorrectAnswers - a.incorrectAnswers || a.accuracyRate - b.accuracyRate);
+        const totalAttempts = sessionAnswers.length;
+        const correctAttempts = sessionAnswers.filter((a) => a.isCorrect).length;
+        return {
+          id: session.id,
+          finishedAt: session.finishedAt?.toISOString() ?? null,
+          participantCount: sessionPlayers.length,
+          accuracyRate: totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0,
+          employees: sessionEmployees,
+          questionsBreakdown: sessionQuestions,
+        };
+      });
+
       return {
         id: quiz.id,
         title: quiz.title,
@@ -228,6 +277,7 @@ export function createTenantsRouter(): Router {
         avgScore,
         accuracyRate,
         questionsBreakdown,
+        sessions: sessionAnalytics,
       };
     });
 

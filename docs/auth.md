@@ -11,10 +11,10 @@ servidor.
 - **No existe registro público.** `POST /api/v1/auth/register` devuelve **404** a
   propósito. Todas las cuentas las crea un **SUPERADMIN**.
 - Roles (`UserRole`):
-  - **`SUPERADMIN`**: gestiona usuarios (crear/listar/editar/desactivar/borrar) y
-    es el único que puede crear administradores.
-  - **`ADMIN`**: usuario operativo de la plataforma (autoría de quizzes,
-    sesiones en vivo, gestión de medios). **Todos los usuarios creados son ADMIN.**
+  - **`SUPERADMIN`**: gestiona usuarios (crear/listar/editar/desactivar/borrar),
+    crea cuestionarios y sesiones, y consulta métricas de cualquier organización.
+  - **`ADMIN`**: consulta las métricas de su propia organización. No puede
+    consultar datos de otras empresas ni crear cuestionarios o sesiones.
 - Multi-tenant: `User.tenantId` es opcional (`null` = ámbito/plataforma
   compartida). Un ADMIN pertenece a su tenant; sus activos de medios quedan
   acotados a ese tenant.

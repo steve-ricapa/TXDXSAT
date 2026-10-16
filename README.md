@@ -133,6 +133,7 @@ sus variables con Zod al arrancar y falla rápido si falta `DATABASE_URL`.
 | `STORAGE_MAX_BYTES` | Tamaño máximo por imagen, en bytes | `5242880` (5 MB) |
 | `SESSION_TTL_HOURS` | Caducidad de las sesiones de login (horas) | `720` |
 | `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` / `SUPERADMIN_NAME` | Superadmin inicial (solo se crea si no hay cuentas) | — |
+| `SEED_DEMO_DATA` | Crea tenants, cuentas y datos de demo; desactivado por defecto (se activa en `compose.dev.yaml`) | `false` |
 | `VITE_BASE_PATH` | Prefijo público de despliegue | `/sat/` |
 
 > ⚠️ No se guardan credenciales en el repositorio: `.env` está ignorado por Git.

@@ -9,6 +9,7 @@ import { AVATARS, DEFAULT_AVATAR_ID } from "../lib/avatars";
 import { ClientEvents, ServerEvents } from "../lib/protocol";
 import type { PlayerJoinedAckPayload } from "../lib/protocol";
 import { playerStore } from "../lib/storage";
+import { liveErrorMessage } from "../lib/error-message";
 
 /**
  * Player entry point (`/live/join`).
@@ -78,7 +79,7 @@ export function JoinPage() {
       });
       navigate(`/live/play/${ack.sessionId}`, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
+      setError(liveErrorMessage(err instanceof Error ? err.message : undefined));
     } finally {
       setBusy(false);
     }
@@ -144,7 +145,11 @@ export function JoinPage() {
             </div>
           </div>
 
-          {error && <p className="rounded-xl bg-danger/15 px-4 py-3 text-sm text-danger-readable">{error}</p>}
+          {error && (
+            <p role="alert" className="mx-auto max-w-sm border-l-2 border-danger bg-danger/5 px-3 py-2 text-xs leading-relaxed text-danger-readable">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"

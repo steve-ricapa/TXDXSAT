@@ -22,20 +22,22 @@ function optionImage(question: PublicQuestion, slot: number): string | null {
 }
 
 /**
- * Participant answer pad. Large, thumb-friendly, no scrolling. Single-choice
- * submits on tap; multi-select and typed answers need an explicit submit. After
+ * Participant answer pad. Large, thumb-friendly, no scrolling. Every answer
+ * needs explicit confirmation so a tap is visibly selectable before submission. After
  * answering the pad visually locks. The server remains authoritative.
  */
 export function QuestionPanel({
   question,
   answered,
+  submitting = false,
   onSubmit,
   submitted,
 }: {
   question: PublicQuestion;
   answered: boolean;
+  submitting?: boolean;
   onSubmit: (answer: AnswerSubmission) => void;
-  submitted?: { slot?: number; text?: string } | null;
+  submitted?: { slot?: number; slots?: number[]; text?: string } | null;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
   const [text, setText] = useState("");
@@ -47,6 +49,16 @@ export function QuestionPanel({
 
   const slots = question.options.map((_, index) => index);
   const isMulti = question.type === "multi_select";
+  const selectedSlots = submitted?.slots ?? (submitted?.slot === undefined ? [] : [submitted.slot]);
+
+  const selectedAnswer = (
+    <div className="w-full max-w-sm space-y-2">
+      {selectedSlots.map((slot) => (
+        <AnswerCard key={slot} slot={slot} text={optionText(question, slot)} variant="player" state="selected" />
+      ))}
+      {submitted?.text && <p className="game-chip rounded-2xl px-4 py-4 font-semibold text-ink">“{submitted.text}”</p>}
+    </div>
+  );
 
   if (answered) {
     return (
@@ -55,23 +67,25 @@ export function QuestionPanel({
           ✅
         </div>
         <div>
-          <p className="text-2xl font-black text-ink">¡Respuesta enviada!</p>
+          <p className="text-2xl font-black text-ink">¡Respuesta confirmada!</p>
           <p className="mt-1 text-sm text-ink-muted">Espera a que el anfitrión muestre los resultados.</p>
         </div>
-
-        {(submitted?.slot !== undefined || submitted?.text) && (
-          <div className="w-full max-w-sm">
-            {submitted?.slot !== undefined && submitted.slot >= 0 ? (
-              <AnswerCard slot={submitted.slot} text={optionText(question, submitted.slot)} variant="player" state="idle" />
-            ) : (
-              <p className="game-chip rounded-2xl px-4 py-4 font-semibold text-ink">
-                “{submitted?.text}”
-              </p>
-            )}
-          </div>
-        )}
+        {selectedSlots.length > 0 || submitted?.text ? selectedAnswer : null}
 
         <p className="text-xs uppercase tracking-widest text-ink-soft">🔒 Respuesta bloqueada</p>
+      </div>
+    );
+  }
+
+  if (submitting) {
+    return (
+      <div className="pop-in flex h-full flex-col items-center justify-center gap-4 text-center">
+        {(selectedSlots.length > 0 || submitted?.text) && <>
+          <p className="text-xs font-bold uppercase tracking-widest text-ink-muted">Tu selección</p>
+          {selectedAnswer}
+        </>}
+        <span className="text-4xl animate-pulse">⏳</span>
+        <p className="text-xl font-black text-ink">Enviando respuesta…</p>
       </div>
     );
   }
@@ -137,7 +151,7 @@ export function QuestionPanel({
               text={optionText(question, slot)}
               imageUrl={optionImage(question, slot)}
               variant="player"
-              state={isSelected ? "selected" : "idle"}
+              state={isSelected ? "selected" : selected.length > 0 ? "dimmed" : "idle"}
               index={slot}
               className="flex-1"
               onClick={() =>
@@ -147,7 +161,7 @@ export function QuestionPanel({
                         ? current.filter((value) => value !== slot)
                         : [...current, slot].sort((a, b) => a - b),
                     )
-                  : onSubmit({ chosenIndex: slot })
+                  : setSelected([slot])
               }
             />
           );
@@ -163,6 +177,23 @@ export function QuestionPanel({
         >
           Enviar {selected.length > 0 && `(${selected.length})`}
         </button>
+      )}
+
+      {!isMulti && (
+        <button
+          type="button"
+          disabled={selected.length === 0}
+          onClick={() => onSubmit({ chosenIndex: selected[0] })}
+          className="flex items-center justify-center rounded-2xl bg-accent px-6 py-4 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
+        >
+          Confirmar respuesta
+        </button>
+      )}
+
+      {selected.length > 0 && (
+        <p className="text-center text-xs text-ink-muted">
+          Puedes tocar otra opción y cambiar tu selección antes de confirmar.
+        </p>
       )}
 
       {isMulti && selected.length > 0 && (

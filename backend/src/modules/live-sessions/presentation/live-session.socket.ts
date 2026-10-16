@@ -45,6 +45,10 @@ export function registerLiveSessionSocketHandlers(
         socket.emit(ServerEvents.gameLeaderboard, engine.getLeaderboard(session.id));
         const open = engine.getOpenQuestion(session);
         if (open) socket.emit(ServerEvents.gameQuestion, open);
+        if (session.status === "FINISHED") {
+          const ended = engine.getEndedPayload(session);
+          if (ended) socket.emit(ServerEvents.gameEnded, ended);
+        }
       } catch (error: unknown) {
         sendError(socket, error, ClientEvents.hostJoin, logger);
       }
@@ -64,6 +68,10 @@ export function registerLiveSessionSocketHandlers(
         socket.emit(ServerEvents.gameLeaderboard, engine.getLeaderboard(session.id));
         const open = engine.getOpenQuestion(session);
         if (open) socket.emit(ServerEvents.gameQuestion, open);
+        if (session.status === "FINISHED") {
+          const ended = engine.getEndedPayload(session);
+          if (ended) socket.emit(ServerEvents.gameEnded, ended);
+        }
       } catch (error: unknown) {
         sendError(socket, error, ClientEvents.presentJoin, logger);
       }
@@ -82,7 +90,24 @@ export function registerLiveSessionSocketHandlers(
         const session = await engine.findByPin(pin);
         if (!session) throw new NotFoundError("No live session with that PIN");
         if (data.sessionId && data.sessionId !== session.id) {
-          throw new ForbiddenError("Reconnect before joining another session");
+          if (data.userId && data.userId !== user.id) {
+            throw new ForbiddenError("Reconnect after switching accounts");
+          }
+          const previousSession = await engine.findById(data.sessionId);
+          if (previousSession && previousSession.status !== "FINISHED") {
+            throw new ForbiddenError("La sesión anterior todavía está activa. Espera a que finalice antes de unirte a otra.");
+          }
+
+          // A player may continue to another quiz after the previous one ends;
+          // release the old room/socket binding without affecting login state.
+          engine.handleDisconnect(socket.id);
+          await socket.leave(Rooms.session(data.sessionId));
+          if (data.playerId) await socket.leave(Rooms.player(data.playerId));
+          data.role = undefined;
+          data.sessionId = undefined;
+          data.playerId = undefined;
+          data.userId = undefined;
+          data.sessionToken = undefined;
         }
         if (data.userId && data.userId !== user.id) {
           throw new ForbiddenError("Reconnect after switching accounts");
@@ -114,9 +139,13 @@ export function registerLiveSessionSocketHandlers(
           score: player.score,
           reconnected,
         });
-        socket.emit(ServerEvents.sessionState, engine.getState(session));
+        io.to(Rooms.session(session.id)).emit(ServerEvents.sessionState, engine.getState(session));
         const open = engine.getOpenQuestion(session);
         if (open) socket.emit(ServerEvents.gameQuestion, open);
+        if (session.status === "FINISHED") {
+          const ended = engine.getEndedPayload(session);
+          if (ended) socket.emit(ServerEvents.gameEnded, ended);
+        }
       } catch (error: unknown) {
         sendError(socket, error, ClientEvents.playerJoin, logger);
         if (error instanceof NotFoundError) {
@@ -137,7 +166,8 @@ export function registerLiveSessionSocketHandlers(
     socket.on(ClientEvents.hostStart, async (payload: any) => {
       try {
         const sessionId = requireHost(data, payload?.sessionId);
-        await engine.start(sessionId);
+        const session = await engine.start(sessionId);
+        io.to(Rooms.session(sessionId)).emit(ServerEvents.sessionState, engine.getState(session));
       } catch (error: unknown) {
         sendError(socket, error, ClientEvents.hostStart, logger);
       }

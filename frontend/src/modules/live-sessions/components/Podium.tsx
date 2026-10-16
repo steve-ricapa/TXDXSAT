@@ -40,7 +40,7 @@ export function Podium({
 
   return (
     <div className="relative space-y-8">
-      <Confetti />
+      <Confetti fixed pieces={110} />
 
       <div className="relative flex items-end justify-center gap-3 sm:gap-6">
         {order.map((entry, position) => {

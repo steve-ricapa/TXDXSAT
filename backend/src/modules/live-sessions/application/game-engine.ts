@@ -461,6 +461,28 @@ export class GameEngine {
     return session;
   }
 
+  getEndedPayload(session: EngineSession) {
+    if (session.status !== "FINISHED") return null;
+    const leaderboard = this.getLeaderboard(session.id);
+    const answersByPlayer = this.countAnswersByPlayer(session);
+    const resultEntries: LiveSessionResultEntry[] = leaderboard.map((entry) => ({
+      rank: entry.rank,
+      playerId: entry.playerId,
+      username: entry.username,
+      avatar: entry.avatar,
+      score: entry.score,
+      correctAnswers: answersByPlayer.get(entry.playerId)?.correct ?? 0,
+      totalAnswers: answersByPlayer.get(entry.playerId)?.total ?? 0,
+    }));
+    return {
+      sessionId: session.id,
+      quizTitle: session.quizTitle,
+      participantCount: session.players.size,
+      podium: resultEntries.slice(0, 3),
+      leaderboard: resultEntries,
+    };
+  }
+
   // --- Answering -----------------------------------------------------------
 
   async submitAnswer(input: SubmitAnswerInput): Promise<{ session: EngineSession; record: AnswerRecord }> {

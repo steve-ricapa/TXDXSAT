@@ -16,11 +16,13 @@ import type {
   AnswerCountPayload,
   GameEndedPayload,
   LeaderboardEntry,
+  PlayerJoinedPayload,
   PublicQuestion,
   ResultsPayload,
   SessionStatePayload,
 } from "../lib/protocol";
 import { hostStore, type StoredHost } from "../lib/storage";
+import { liveErrorMessage } from "../lib/error-message";
 
 /** Host control screen (`/live/host/:sessionId`), protected by the host token. */
 export function HostPage() {
@@ -44,6 +46,8 @@ export function HostPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [ended, setEnded] = useState<GameEndedPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [startPending, setStartPending] = useState(false);
   const joinedRef = useRef(false);
   const remaining = useCountdown(question && !results ? question.endsAt : null);
 
@@ -64,7 +68,10 @@ export function HostPage() {
     if (!hostToken || joinedRef.current) return;
     joinedRef.current = true;
     const socket = getSocket();
-    const onError = (payload: { message?: string }) => setError(payload?.message ?? "Error");
+    const onError = (payload: { message?: string }) => {
+      setError(liveErrorMessage(payload?.message));
+      setStartPending(false);
+    };
     socket.on(ServerEvents.error, onError);
     socket.emit(ClientEvents.hostJoin, { sessionId, hostToken });
     return () => {
@@ -92,6 +99,36 @@ export function HostPage() {
     setQuestion(payload);
     setResults(null);
     setAnsweredCount(0);
+    setCountdown(null);
+    setStartPending(false);
+    setState((current) => current ? { ...current, status: "ACTIVE", questionIndex: payload.index } : current);
+  });
+
+  useSocketEvent<{ countdownSeconds: number }>(ServerEvents.gameStarted, () => {
+    setError(null);
+    setStartPending(false);
+    setQuestion(null);
+    setResults(null);
+    setEnded(null);
+    setState((current) => current ? { ...current, status: "ACTIVE" } : current);
+  });
+
+  useSocketEvent<{ seconds: number }>(ServerEvents.gameCountdown, (payload) => setCountdown(payload.seconds));
+
+  useSocketEvent<PlayerJoinedPayload>(ServerEvents.playerJoined, (player) => {
+    setState((current) => {
+      if (!current) return current;
+      const players = current.players.filter((item) => item.playerId !== player.playerId);
+      players.push(player);
+      return { ...current, players };
+    });
+  });
+
+  useSocketEvent<{ playerId: string }>(ServerEvents.playerLeft, ({ playerId }) => {
+    setState((current) => current ? {
+      ...current,
+      players: current.players.map((player) => player.playerId === playerId ? { ...player, connected: false } : player),
+    } : current);
   });
 
   useSocketEvent<AnswerCountPayload>(ServerEvents.gameAnswerCount, (payload) =>
@@ -105,9 +142,30 @@ export function HostPage() {
 
   useSocketEvent<LeaderboardEntry[]>(ServerEvents.gameLeaderboard, (payload) => setLeaderboard(payload));
 
-  useSocketEvent<GameEndedPayload>(ServerEvents.gameEnded, (payload) => setEnded(payload));
+  useSocketEvent<GameEndedPayload>(ServerEvents.gameEnded, (payload) => {
+    setEnded(payload);
+    setError(null);
+    setCountdown(null);
+    setState((current) => current ? { ...current, status: "FINISHED" } : current);
+  });
 
   const emit = useCallback((event: string) => getSocket().emit(event, { sessionId }), [sessionId]);
+  const startSession = useCallback(() => {
+    if (startPending) return;
+    setError(null);
+    setStartPending(true);
+    emit(ClientEvents.hostStart);
+  }, [emit, startPending]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => setCountdown((value) => value === null ? null : value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   async function createSession() {
     if (!selectedQuiz) return;
@@ -251,7 +309,8 @@ export function HostPage() {
                 questionCount={state?.questionCount ?? 0}
                 players={state?.players ?? []}
                 role="host"
-                onStart={() => emit(ClientEvents.hostStart)}
+                onStart={startSession}
+                starting={startPending}
               />
             </div>
           )}
@@ -297,10 +356,37 @@ export function HostPage() {
             </>
           )}
 
+          {status === "ACTIVE" && !question && !ended && (
+            <div className="game-panel flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl p-8 text-center">
+              <span className="text-7xl font-black tabular-nums text-ink">{countdown ?? "…"}</span>
+              <p className="mt-3 text-lg font-bold text-ink-muted">
+                {countdown === null ? "Preparando la primera pregunta…" : "La partida está por comenzar"}
+              </p>
+            </div>
+          )}
+
+          {status === "FINISHED" && !ended && (
+            <div className="game-panel flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl p-8 text-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+              <p className="mt-4 text-base font-bold text-ink-muted">Cargando resultados finales…</p>
+            </div>
+          )}
+
           {ended && (
-            <div className="game-panel relative min-h-0 flex-1 overflow-y-auto rounded-3xl p-6">
-              <h2 className="mb-6 text-center text-2xl font-black text-ink">🏆 Resultado final</h2>
-              <Podium podium={ended.podium} leaderboard={ended.leaderboard} />
+            <div className="game-panel relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto rounded-3xl p-6">
+              <div className="my-auto flex w-full max-w-4xl flex-col items-center py-4">
+                <h2 className="mb-6 text-center text-3xl font-black text-ink">🏆 Resultado final</h2>
+                <Podium podium={ended.podium} leaderboard={ended.leaderboard} />
+                <div className="mt-8 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/dashboard")}
+                    className="rounded-xl bg-accent px-8 py-3.5 font-bold text-[#04211f] shadow-lg shadow-accent/20 transition hover:scale-105 hover:brightness-110 active:scale-95"
+                  >
+                    Finalizar y volver al panel
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </main>

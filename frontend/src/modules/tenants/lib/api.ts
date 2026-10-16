@@ -37,6 +37,22 @@ export interface QuizAnalytics {
   avgScore: number;
   accuracyRate: number;
   questionsBreakdown: QuestionBreakdown[];
+  sessions: Array<{
+    id: string;
+    finishedAt: string | null;
+    participantCount: number;
+    accuracyRate: number;
+    employees: Array<{
+      userId: string | null;
+      name: string;
+      score: number;
+      totalAnswers: number;
+      correctAnswers: number;
+      incorrectAnswers: number;
+      accuracyRate: number;
+    }>;
+    questionsBreakdown: QuestionBreakdown[];
+  }>;
 }
 
 export interface EmployeeProgress {

@@ -50,18 +50,18 @@ function buildNavigation(role: UserRole | undefined): NavSection[] {
   if (role === "ADMIN" || role === "SUPERADMIN") {
     sections.push({
       title: "Operación",
-      items: [
-        { to: "/admin", label: "Panel", icon: LayoutDashboard },
-        { to: "/live/host", label: "Sesiones en vivo", icon: Radio },
-        { to: "/live/editor", label: "Editor de quizzes", icon: Pencil },
-      ],
+      items: [{ to: "/admin", label: "Panel", icon: LayoutDashboard }],
     });
   }
 
   if (role === "SUPERADMIN") {
     sections.push({
       title: "Administración",
-      items: [{ to: "/superadmin", label: "Usuarios", icon: Users }],
+      items: [
+        { to: "/superadmin", label: "Usuarios", icon: Users },
+        { to: "/live/host", label: "Sesiones en vivo", icon: Radio },
+        { to: "/live/editor", label: "Editor de quizzes", icon: Pencil },
+      ],
     });
   }
 

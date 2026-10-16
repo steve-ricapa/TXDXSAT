@@ -64,6 +64,7 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
     volumes:
       # Persistent, named volume for uploaded images. Survives `docker compose
       # down` (without -v), image rebuilds and code updates. See docs/storage.md.

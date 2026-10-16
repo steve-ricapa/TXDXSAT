@@ -64,6 +64,7 @@ const schema = z.object({
   SUPERADMIN_EMAIL: z.string().default(""),
   SUPERADMIN_PASSWORD: z.string().default(""),
   SUPERADMIN_NAME: z.string().default("Super Admin"),
+  SEED_DEMO_DATA: booleanish.default(false),
 });
 
 export type Env = z.infer<typeof schema>;

@@ -33,9 +33,9 @@ async function bootstrap(): Promise<void> {
   logger.info("database connection established");
 
   // --- Auth & Demo bootstrap -----------------------------------------------
-  // Create the first superadmin from env and seed realistic tenants & demo data.
+  // Bootstrap the first superadmin independently from optional demo fixtures.
   await ensureSuperadmin(logger);
-  await ensureDemoData(logger);
+  if (env.SEED_DEMO_DATA) await ensureDemoData(logger);
 
   // --- Event infrastructure ------------------------------------------------
   const bus = new EventBus();

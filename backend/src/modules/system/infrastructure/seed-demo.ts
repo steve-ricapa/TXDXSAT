@@ -1,15 +1,82 @@
 import type { Logger } from "pino";
+import { Prisma } from "../../../generated/prisma/client.ts";
 import { prisma } from "../../../shared/database/prisma.ts";
 import { hashPassword } from "../../../shared/utils/password.ts";
 
+type IdMapping = { from: string; to: string };
+
+const LEGACY_TENANT_IDS: IdMapping[] = [
+  { from: "11111111-1111-1111-1111-111111111111", to: "11111111-1111-4111-8111-111111111111" },
+  { from: "22222222-2222-2222-2222-222222222222", to: "22222222-2222-4222-8222-222222222222" },
+];
+
+const LEGACY_USER_IDS: IdMapping[] = [
+  { from: "a1111111-1111-1111-1111-111111111111", to: "a1111111-1111-4111-8111-111111111111" },
+  { from: "a2222222-2222-2222-2222-222222222222", to: "a2222222-2222-4222-8222-222222222222" },
+  { from: "e1111111-1111-1111-1111-111111111111", to: "e1111111-1111-4111-8111-111111111111" },
+  { from: "e2222222-2222-2222-2222-222222222222", to: "e2222222-2222-4222-8222-222222222222" },
+  { from: "e3333333-3333-3333-3333-333333333333", to: "e3333333-3333-4333-8333-333333333333" },
+  { from: "e4444444-4444-4444-4444-444444444444", to: "e4444444-4444-4444-8444-444444444444" },
+  { from: "e5555555-5555-5555-5555-555555555555", to: "e5555555-5555-4555-8555-555555555555" },
+  { from: "e6666666-6666-6666-6666-666666666666", to: "e6666666-6666-4666-8666-666666666666" },
+  { from: "e7777777-7777-7777-7777-777777777777", to: "e7777777-7777-4777-8777-777777777777" },
+];
+
+const LEGACY_QUIZ_IDS: IdMapping[] = [
+  { from: "33333333-3333-3333-3333-333333333333", to: "33333333-3333-4333-8333-333333333333" },
+  { from: "44444444-4444-4444-4444-444444444444", to: "44444444-4444-4444-8444-444444444444" },
+];
+
+const LEGACY_QUESTION_IDS: IdMapping[] = [
+  { from: "b1111111-1111-1111-1111-111111111111", to: "b1111111-1111-4111-8111-111111111111" },
+  { from: "b2222222-2222-2222-2222-222222222222", to: "b2222222-2222-4222-8222-222222222222" },
+  { from: "b3333333-3333-3333-3333-333333333333", to: "b3333333-3333-4333-8333-333333333333" },
+  { from: "b4444444-4444-4444-4444-444444444444", to: "b4444444-4444-4444-8444-444444444444" },
+  { from: "b5555555-5555-5555-5555-555555555555", to: "b5555555-5555-4555-8555-555555555555" },
+  { from: "c1111111-1111-1111-1111-111111111111", to: "c1111111-1111-4111-8111-111111111111" },
+  { from: "c2222222-2222-2222-2222-222222222222", to: "c2222222-2222-4222-8222-222222222222" },
+  { from: "c3333333-3333-3333-3333-333333333333", to: "c3333333-3333-4333-8333-333333333333" },
+];
+
+const LEGACY_SESSION_IDS: IdMapping[] = [
+  { from: "66666666-6666-6666-6666-666666666666", to: "66666666-6666-4666-8666-666666666666" },
+];
+
+async function normalizeLegacyDemoIds(): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const updateColumn = async (table: string, column: string, mapping: IdMapping) => {
+      await tx.$executeRaw(
+        Prisma.sql`UPDATE ${Prisma.raw(table)} SET ${Prisma.raw(column)} = ${mapping.to}::uuid WHERE ${Prisma.raw(column)} = ${mapping.from}::uuid`,
+      );
+    };
+
+    for (const mapping of LEGACY_TENANT_IDS) {
+      for (const table of ["users", "quizzes", "live_sessions", "live_players", "live_answers", "media_assets"]) {
+        await updateColumn(table, "tenant_id", mapping);
+      }
+      await updateColumn("tenants", "id", mapping);
+    }
+
+    for (const mapping of LEGACY_USER_IDS) await updateColumn("users", "id", mapping);
+    for (const mapping of LEGACY_QUIZ_IDS) await updateColumn("quizzes", "id", mapping);
+    for (const mapping of LEGACY_SESSION_IDS) await updateColumn("live_sessions", "id", mapping);
+
+    for (const mapping of LEGACY_QUESTION_IDS) {
+      await updateColumn("live_answers", "question_id", mapping);
+      await updateColumn("media_assets", "question_id", mapping);
+      await updateColumn("questions", "id", mapping);
+    }
+  });
+}
+
 export const DEMO_TENANTS = {
   acme: {
-    id: "11111111-1111-1111-1111-111111111111",
+    id: "11111111-1111-4111-8111-111111111111",
     name: "Acme Cybersecurity Corp",
     slug: "acme-corp",
   },
   fintech: {
-    id: "22222222-2222-2222-2222-222222222222",
+    id: "22222222-2222-4222-8222-222222222222",
     name: "FinTech Global Segura",
     slug: "fintech-global",
   },
@@ -18,7 +85,7 @@ export const DEMO_TENANTS = {
 export const DEMO_USERS = [
   // Tenant 1: Acme Admin
   {
-    id: "a1111111-1111-1111-1111-111111111111",
+    id: "a1111111-1111-4111-8111-111111111111",
     email: "admin@acme.com",
     name: "Laura Ramos (Admin Acme)",
     role: "ADMIN" as const,
@@ -26,35 +93,35 @@ export const DEMO_USERS = [
   },
   // Tenant 1: Acme Employees
   {
-    id: "e1111111-1111-1111-1111-111111111111",
+    id: "e1111111-1111-4111-8111-111111111111",
     email: "carlos.mendoza@acme.com",
     name: "Carlos Mendoza",
     role: "EMPLOYEE" as const,
     tenantId: DEMO_TENANTS.acme.id,
   },
   {
-    id: "e2222222-2222-2222-2222-222222222222",
+    id: "e2222222-2222-4222-8222-222222222222",
     email: "maria.torres@acme.com",
     name: "María Torres",
     role: "EMPLOYEE" as const,
     tenantId: DEMO_TENANTS.acme.id,
   },
   {
-    id: "e3333333-3333-3333-3333-333333333333",
+    id: "e3333333-3333-4333-8333-333333333333",
     email: "lucia.castro@acme.com",
     name: "Lucía Castro",
     role: "EMPLOYEE" as const,
     tenantId: DEMO_TENANTS.acme.id,
   },
   {
-    id: "e4444444-4444-4444-4444-444444444444",
+    id: "e4444444-4444-4444-8444-444444444444",
     email: "jorge.vega@acme.com",
     name: "Jorge Vega",
     role: "EMPLOYEE" as const,
     tenantId: DEMO_TENANTS.acme.id,
   },
   {
-    id: "e5555555-5555-5555-5555-555555555555",
+    id: "e5555555-5555-4555-8555-555555555555",
     email: "andrea.rios@acme.com",
     name: "Andrea Ríos",
     role: "EMPLOYEE" as const,
@@ -62,7 +129,7 @@ export const DEMO_USERS = [
   },
   // Tenant 2: FinTech Admin
   {
-    id: "a2222222-2222-2222-2222-222222222222",
+    id: "a2222222-2222-4222-8222-222222222222",
     email: "admin@fintech.com",
     name: "Roberto Silva (Admin FinTech)",
     role: "ADMIN" as const,
@@ -70,14 +137,14 @@ export const DEMO_USERS = [
   },
   // Tenant 2: FinTech Employees
   {
-    id: "e6666666-6666-6666-6666-666666666666",
+    id: "e6666666-6666-4666-8666-666666666666",
     email: "diego.sanchez@fintech.com",
     name: "Diego Sánchez",
     role: "EMPLOYEE" as const,
     tenantId: DEMO_TENANTS.fintech.id,
   },
   {
-    id: "e7777777-7777-7777-7777-777777777777",
+    id: "e7777777-7777-4777-8777-777777777777",
     email: "elena.paredes@fintech.com",
     name: "Elena Paredes",
     role: "EMPLOYEE" as const,
@@ -87,13 +154,14 @@ export const DEMO_USERS = [
 
 export async function ensureDemoData(logger: Logger): Promise<void> {
   try {
+    await normalizeLegacyDemoIds();
     const passwordHash = await hashPassword("Password123!");
 
     // 1. Seed Tenants
     for (const tenant of Object.values(DEMO_TENANTS)) {
       await prisma.tenant.upsert({
         where: { id: tenant.id },
-        update: { name: tenant.name, slug: tenant.slug },
+        update: {},
         create: { id: tenant.id, name: tenant.name, slug: tenant.slug },
       });
     }
@@ -102,7 +170,8 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     for (const u of DEMO_USERS) {
       await prisma.user.upsert({
         where: { email: u.email },
-        update: { name: u.name, role: u.role, tenantId: u.tenantId, passwordHash },
+        // Preserve changes to existing demo accounts, especially credentials.
+        update: {},
         create: {
           id: u.id,
           email: u.email,
@@ -116,14 +185,10 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     }
 
     // 3. Seed Model Phishing Quiz for Acme Corp
-    const phishingQuizId = "33333333-3333-3333-3333-333333333333";
+    const phishingQuizId = "33333333-3333-4333-8333-333333333333";
     const phishingQuiz = await prisma.quiz.upsert({
       where: { id: phishingQuizId },
-      update: {
-        title: "Evaluación Crítica: Detección y Respuesta a Phishing 2026",
-        description: "Simulación práctica de correos maliciosos, suplantación de identidad (spoofing), URLs falsificadas y vectores de ingeniería social.",
-        tenantId: DEMO_TENANTS.acme.id,
-      },
+      update: {},
       create: {
         id: phishingQuizId,
         title: "Evaluación Crítica: Detección y Respuesta a Phishing 2026",
@@ -136,7 +201,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     // Seed Questions for Phishing Quiz
     const phishingQuestions = [
       {
-        id: "q1111111-1111-1111-1111-111111111111",
+        id: "b1111111-1111-4111-8111-111111111111",
         quizId: phishingQuiz.id,
         orderIndex: 0,
         type: "MULTIPLE_CHOICE" as const,
@@ -153,7 +218,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
         timeSec: 30,
       },
       {
-        id: "q2222222-2222-2222-2222-222222222222",
+        id: "b2222222-2222-4222-8222-222222222222",
         quizId: phishingQuiz.id,
         orderIndex: 1,
         type: "MULTIPLE_CHOICE" as const,
@@ -170,7 +235,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
         timeSec: 25,
       },
       {
-        id: "q3333333-3333-3333-3333-333333333333",
+        id: "b3333333-3333-4333-8333-333333333333",
         quizId: phishingQuiz.id,
         orderIndex: 2,
         type: "MULTIPLE_CHOICE" as const,
@@ -187,7 +252,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
         timeSec: 30,
       },
       {
-        id: "q4444444-4444-4444-4444-444444444444",
+        id: "b4444444-4444-4444-8444-444444444444",
         quizId: phishingQuiz.id,
         orderIndex: 3,
         type: "MULTIPLE_CHOICE" as const,
@@ -204,7 +269,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
         timeSec: 25,
       },
       {
-        id: "q5555555-5555-5555-5555-555555555555",
+        id: "b5555555-5555-4555-8555-555555555555",
         quizId: phishingQuiz.id,
         orderIndex: 4,
         type: "MULTIPLE_CHOICE" as const,
@@ -225,27 +290,16 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     for (const q of phishingQuestions) {
       await prisma.question.upsert({
         where: { quizId_orderIndex: { quizId: phishingQuiz.id, orderIndex: q.orderIndex } },
-        update: {
-          text: q.text,
-          options: q.options,
-          correctIndex: q.correctIndex,
-          explanation: q.explanation,
-          baseScore: q.baseScore,
-          timeSec: q.timeSec,
-        },
+        update: {},
         create: q,
       });
     }
 
     // 4. Seed Second Quiz (Ready for live execution with PIN)
-    const liveQuizId = "44444444-4444-4444-4444-444444444444";
+    const liveQuizId = "44444444-4444-4444-8444-444444444444";
     const liveQuiz = await prisma.quiz.upsert({
       where: { id: liveQuizId },
-      update: {
-        title: "Ingeniería Social y Protección de Credenciales (En Vivo)",
-        description: "Sesión interactiva en tiempo real sobre defensas activas ante suplantación y ataques modernos.",
-        tenantId: DEMO_TENANTS.acme.id,
-      },
+      update: {},
       create: {
         id: liveQuizId,
         title: "Ingeniería Social y Protección de Credenciales (En Vivo)",
@@ -257,7 +311,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
 
     const liveQuestions = [
       {
-        id: "l1111111-1111-1111-1111-111111111111",
+        id: "c1111111-1111-4111-8111-111111111111",
         quizId: liveQuiz.id,
         orderIndex: 0,
         type: "TRUE_FALSE" as const,
@@ -269,7 +323,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
         timeSec: 20,
       },
       {
-        id: "l2222222-2222-2222-2222-222222222222",
+        id: "c2222222-2222-4222-8222-222222222222",
         quizId: liveQuiz.id,
         orderIndex: 1,
         type: "MULTIPLE_CHOICE" as const,
@@ -286,7 +340,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
         timeSec: 25,
       },
       {
-        id: "l3333333-3333-3333-3333-333333333333",
+        id: "c3333333-3333-4333-8333-333333333333",
         quizId: liveQuiz.id,
         orderIndex: 2,
         type: "MULTIPLE_CHOICE" as const,
@@ -307,29 +361,16 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     for (const q of liveQuestions) {
       await prisma.question.upsert({
         where: { quizId_orderIndex: { quizId: liveQuiz.id, orderIndex: q.orderIndex } },
-        update: {
-          text: q.text,
-          options: q.options,
-          correctIndex: q.correctIndex,
-          explanation: q.explanation,
-          baseScore: q.baseScore,
-          timeSec: q.timeSec,
-        },
+        update: {},
         create: q,
       });
     }
 
     // 5. Seed Historical Completed Session for Phishing Quiz with Real Employee Results
-    const historicalSessionId = "66666666-6666-6666-6666-666666666666";
+    const historicalSessionId = "66666666-6666-4666-8666-666666666666";
     const historicalSession = await prisma.liveSession.upsert({
       where: { id: historicalSessionId },
-      update: {
-        status: "FINISHED",
-        currentQuestionIndex: 4,
-        participantCount: 5,
-        startedAt: new Date(Date.now() - 24 * 3600 * 1000),
-        finishedAt: new Date(Date.now() - 24 * 3600 * 1000 + 15 * 60 * 1000),
-      },
+      update: {},
       create: {
         id: historicalSessionId,
         tenantId: DEMO_TENANTS.acme.id,
@@ -354,31 +395,31 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     // 5. Andrea Ríos: 1/5 (Score: 480) - En riesgo / Requiere Refuerzo (falló Q1, Q2, Q3, Q4)
     const playerConfigs = [
       {
-        userId: "e1111111-1111-1111-1111-111111111111",
+        userId: "e1111111-1111-4111-8111-111111111111",
         username: "Carlos Mendoza",
         score: 2450,
         answers: [true, true, true, true, true],
       },
       {
-        userId: "e2222222-2222-2222-2222-222222222222",
+        userId: "e2222222-2222-4222-8222-222222222222",
         username: "María Torres",
         score: 1980,
         answers: [true, true, false, true, true],
       },
       {
-        userId: "e3333333-3333-3333-3333-333333333333",
+        userId: "e3333333-3333-4333-8333-333333333333",
         username: "Lucía Castro",
         score: 1420,
         answers: [true, true, false, false, true],
       },
       {
-        userId: "e4444444-4444-4444-4444-444444444444",
+        userId: "e4444444-4444-4444-8444-444444444444",
         username: "Jorge Vega",
         score: 950,
         answers: [true, false, false, false, true],
       },
       {
-        userId: "e5555555-5555-5555-5555-555555555555",
+        userId: "e5555555-5555-4555-8555-555555555555",
         username: "Andrea Ríos",
         score: 480,
         answers: [false, false, false, false, true],
@@ -388,7 +429,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     for (const p of playerConfigs) {
       const player = await prisma.livePlayer.upsert({
         where: { sessionId_username: { sessionId: historicalSession.id, username: p.username } },
-        update: { score: p.score, userId: p.userId, tenantId: DEMO_TENANTS.acme.id },
+        update: {},
         create: {
           sessionId: historicalSession.id,
           tenantId: DEMO_TENANTS.acme.id,
@@ -408,7 +449,7 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
 
         await prisma.liveAnswer.upsert({
           where: { playerId_questionId: { playerId: player.id, questionId: q.id } },
-          update: { chosenIndex, isCorrect, score },
+          update: {},
           create: {
             sessionId: historicalSession.id,
             tenantId: DEMO_TENANTS.acme.id,
@@ -426,5 +467,6 @@ export async function ensureDemoData(logger: Logger): Promise<void> {
     logger.info("Demo data verified and seeded successfully (tenants, users, quizzes, session history)");
   } catch (error) {
     logger.error({ err: error }, "Failed to seed demo data");
+    throw error;
   }
 }

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Confetti palette: the four answer colours (the gamified exception) plus the
@@ -11,7 +12,15 @@ const COLORS = ["#E21B3C", "#1368CE", "#D89E00", "#26890C", "#00C7BE", "#38BDF8"
  * library. Purely decorative; hidden entirely when the user prefers reduced
  * motion (see index.css).
  */
-export function Confetti({ pieces = 90 }: { pieces?: number }) {
+export function Confetti({
+  pieces = 90,
+  fixed = false,
+  className = "",
+}: {
+  pieces?: number;
+  fixed?: boolean;
+  className?: string;
+}) {
   const items = useMemo(
     () =>
       Array.from({ length: pieces }, (_, i) => {
@@ -32,8 +41,13 @@ export function Confetti({ pieces = 90 }: { pieces?: number }) {
     [pieces],
   );
 
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+  const container = (
+    <div
+      className={`pointer-events-none overflow-hidden ${
+        fixed ? "fixed inset-0 z-50 h-screen w-screen" : "absolute inset-0"
+      } ${className}`}
+      aria-hidden
+    >
       {items.map((item) => (
         <span
           key={item.id}
@@ -52,4 +66,10 @@ export function Confetti({ pieces = 90 }: { pieces?: number }) {
       ))}
     </div>
   );
+
+  if (fixed && typeof document !== "undefined") {
+    return createPortal(container, document.body);
+  }
+
+  return container;
 }

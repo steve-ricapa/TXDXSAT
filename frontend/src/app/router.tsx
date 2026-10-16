@@ -88,7 +88,7 @@ export const router = createBrowserRouter(
     {
       path: "live/host",
       element: (
-        <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
+        <ProtectedRoute roles={["SUPERADMIN"]}>
           <HostPage />
         </ProtectedRoute>
       ),

@@ -51,7 +51,7 @@ export function createApiRouter(deps: AppDependencies): Router {
   router.use(health.router);
   router.use("/system", system.router);
   router.use("/auth", auth.router);
-  router.use("/tenants", requireAuth, tenants.router);
+  router.use("/tenants", requireAuth, requireRole("ADMIN", "SUPERADMIN"), tenants.router);
 
   // Images: the by-id read is an unguessable capability URL used inside <img>
   // tags; listing, uploading and deleting are authoring operations.
@@ -61,8 +61,8 @@ export function createApiRouter(deps: AppDependencies): Router {
     media.router,
   );
 
-  // Only administrators can author quizzes or open sessions. Result URLs keep
-  // their existing capability-token guard for host/presenter compatibility.
+  // Only the platform superadmin can author quizzes or open sessions. Result
+  // URLs keep their capability-token guard for host/presenter compatibility.
   router.use(
     "/live",
     publicWhen(
@@ -71,7 +71,7 @@ export function createApiRouter(deps: AppDependencies): Router {
     ),
     publicWhen(
       (req) => req.method === "GET" && (/^\/sessions\/[^/]+\/results\/?$/.test(req.path) || /^\/me\/results\/?$/.test(req.path)),
-      requireRole("ADMIN", "SUPERADMIN"),
+      requireRole("SUPERADMIN"),
     ),
     live.router,
   );

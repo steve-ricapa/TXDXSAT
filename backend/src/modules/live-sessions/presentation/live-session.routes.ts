@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { AuthenticatedRequest } from "../../auth/presentation/auth.middleware.ts";
-import { UnauthorizedError } from "../../../shared/errors/app-error.ts";
+import { ForbiddenError, UnauthorizedError } from "../../../shared/errors/app-error.ts";
 import type { LiveSessionStore } from "../application/ports.ts";
 import type {
   CreateLiveSessionUseCase,
@@ -39,10 +39,8 @@ export function createLiveSessionRouter(deps: LiveSessionRouterDeps): Router {
 
   router.post("/quizzes", async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
+    if (user?.role !== "SUPERADMIN") throw new ForbiddenError("Solo el superadministrador puede crear cuestionarios");
     const body = req.body ?? {};
-    if (user?.role !== "SUPERADMIN" && user?.tenantId) {
-      body.tenantId = user.tenantId;
-    }
     const quiz = await deps.createQuiz.execute(body);
     res.status(201).json(quiz);
   });
@@ -63,16 +61,18 @@ export function createLiveSessionRouter(deps: LiveSessionRouterDeps): Router {
   });
 
   router.get("/quizzes/:id", async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
     const quiz = await deps.getQuizDetail.execute(String(req.params.id));
+    if (user?.role !== "SUPERADMIN" && quiz.tenantId !== user?.tenantId) {
+      throw new ForbiddenError("No tienes permisos para consultar este cuestionario");
+    }
     res.json(quiz);
   });
 
   router.put("/quizzes/:id", async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
     const body = req.body ?? {};
-    if (user?.role !== "SUPERADMIN" && user?.tenantId) {
-      body.tenantId = user.tenantId;
-    }
+    if (user?.role !== "SUPERADMIN") throw new ForbiddenError("Solo el superadministrador puede editar cuestionarios");
     const quiz = await deps.updateQuiz.execute(String(req.params.id), body);
     res.json(quiz);
   });
@@ -80,9 +80,7 @@ export function createLiveSessionRouter(deps: LiveSessionRouterDeps): Router {
   router.post("/sessions", async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
     const body = req.body ?? {};
-    if (user?.role !== "SUPERADMIN" && user?.tenantId) {
-      body.tenantId = user.tenantId;
-    }
+    if (user?.role !== "SUPERADMIN") throw new ForbiddenError("Solo el superadministrador puede crear sesiones");
     const session = await deps.createSession.execute(body);
     res.status(201).json(session);
   });

@@ -16,6 +16,7 @@ export function Lobby({
   players,
   role,
   onStart,
+  starting = false,
 }: {
   pin: string;
   joinUrl: string;
@@ -24,6 +25,7 @@ export function Lobby({
   players: PlayerSnapshot[];
   role: "host" | "present" | "player";
   onStart?: () => void;
+  starting?: boolean;
 }) {
   const canStart = players.length > 0;
 
@@ -43,14 +45,14 @@ export function Lobby({
           <button
             type="button"
             onClick={onStart}
-            disabled={!canStart}
+            disabled={!canStart || starting}
             className={`mt-2 w-full max-w-sm rounded-2xl px-8 py-5 text-2xl font-black uppercase tracking-wide transition ${
               canStart
                 ? "bg-accent text-[#04211f] shadow-[0_8px_0_0_#00a79f] hover:brightness-110 active:translate-y-1 active:shadow-none"
                 : "game-chip cursor-not-allowed text-ink-soft"
             }`}
           >
-            {canStart ? "Empezar" : "Esperando jugadores…"}
+            {starting ? "Preparando…" : canStart ? "Empezar" : "Esperando jugadores…"}
           </button>
         )}
         {role === "host" && !canStart && (
