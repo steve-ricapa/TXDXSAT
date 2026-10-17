@@ -1,16 +1,91 @@
 import { Router, type Request, type Response } from "express";
+import { z } from "zod";
+import { Prisma } from "../../generated/prisma/client.ts";
 import { prisma } from "../../shared/database/prisma.ts";
-import { ForbiddenError, NotFoundError, UnauthorizedError } from "../../shared/errors/app-error.ts";
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "../../shared/errors/app-error.ts";
+import { parseOrThrow } from "../../shared/middleware/validate.ts";
 import type { AuthenticatedRequest } from "../auth/presentation/auth.middleware.ts";
 
 export function createTenantsRouter(): Router {
   const router = Router();
+  const tenantSchema = z.object({
+    name: z.string().trim().min(1).max(120),
+    slug: z.string().trim().toLowerCase().min(2).max(60).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido"),
+  });
 
   function currentUser(req: Request) {
     const user = (req as AuthenticatedRequest).user;
     if (!user) throw new UnauthorizedError();
     return user;
   }
+
+  function requireSuperadmin(req: Request) {
+    if (currentUser(req).role !== "SUPERADMIN") throw new ForbiddenError("Solo un superadmin puede gestionar organizaciones");
+  }
+
+  function tenantId(req: Request): string {
+    const id = String(req.params.id);
+    if (!z.uuid().safeParse(id).success) throw new NotFoundError("Organización no encontrada");
+    return id;
+  }
+
+  // Only platform operators can create or change organizations.
+  router.post("/", async (req: Request, res: Response) => {
+    requireSuperadmin(req);
+    const input = parseOrThrow(tenantSchema, req.body);
+    if (await prisma.tenant.findUnique({ where: { slug: input.slug } })) {
+      throw new ConflictError("Ya existe una organización con ese slug");
+    }
+    try {
+      const tenant = await prisma.tenant.create({ data: input });
+      return res.status(201).json({ tenant });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictError("Ya existe una organización con ese slug");
+      }
+      throw error;
+    }
+  });
+
+  router.patch("/:id", async (req: Request, res: Response) => {
+    requireSuperadmin(req);
+    const id = tenantId(req);
+    const input = parseOrThrow(tenantSchema.partial().refine((value) => Object.keys(value).length > 0), req.body);
+    if (!await prisma.tenant.findUnique({ where: { id } })) throw new NotFoundError("Organización no encontrada");
+    if (input.slug && await prisma.tenant.findFirst({ where: { slug: input.slug, NOT: { id } } })) {
+      throw new ConflictError("Ya existe una organización con ese slug");
+    }
+    try {
+      const tenant = await prisma.tenant.update({ where: { id }, data: input });
+      return res.json({ tenant });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictError("Ya existe una organización con ese slug");
+      }
+      throw error;
+    }
+  });
+
+  router.delete("/:id", async (req: Request, res: Response) => {
+    requireSuperadmin(req);
+    const id = tenantId(req);
+    if (!await prisma.tenant.findUnique({ where: { id } })) throw new NotFoundError("Organización no encontrada");
+    const counts = await Promise.all([
+      prisma.user.count({ where: { tenantId: id } }),
+      prisma.quiz.count({ where: { tenantId: id } }),
+      prisma.liveSession.count({ where: { tenantId: id } }),
+      prisma.livePlayer.count({ where: { tenantId: id } }),
+      prisma.liveAnswer.count({ where: { tenantId: id } }),
+      prisma.mediaAsset.count({ where: { tenantId: id } }),
+      prisma.outboxEvent.count({ where: { tenantId: id } }),
+      prisma.eventConsumption.count({ where: { tenantId: id } }),
+    ]);
+    if (counts.some((count) => count > 0)) {
+      throw new ValidationError("No se puede eliminar una organización con datos asociados");
+    }
+    await prisma.tenant.delete({ where: { id } });
+    return res.status(204).end();
+  });
 
   // GET /api/v1/tenants - list tenants accessible to current user
   router.get("/", async (req: Request, res: Response) => {

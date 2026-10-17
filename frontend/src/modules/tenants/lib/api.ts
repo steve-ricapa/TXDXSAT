@@ -93,6 +93,11 @@ export interface TenantAnalytics {
 
 export const tenantsApi = {
   listTenants: () => api.get<{ tenants: TenantSummary[] }>("/tenants"),
+  createTenant: (input: { name: string; slug: string }) =>
+    api.post<{ tenant: TenantSummary }>("/tenants", input),
+  updateTenant: (id: string, input: { name: string; slug: string }) =>
+    api.patch<{ tenant: TenantSummary }>(`/tenants/${id}`, input),
+  deleteTenant: (id: string) => api.delete<void>(`/tenants/${id}`),
   getTenantAnalytics: (tenantId: string) =>
     api.get<TenantAnalytics>(`/tenants/${tenantId}/analytics`),
 };

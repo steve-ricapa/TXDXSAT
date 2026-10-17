@@ -71,7 +71,7 @@ export function AnswerCard({
       <span className="relative flex w-full items-center gap-3 sm:gap-4">
         <AnswerShape
           shape={palette.shape}
-          className={isPlayer ? "h-9 w-9 shrink-0 sm:h-11 sm:w-11" : "h-7 w-7 shrink-0 sm:h-9 sm:w-9"}
+          className={isPlayer ? "h-7 w-7 shrink-0 sm:h-10 sm:w-10" : "h-7 w-7 shrink-0 sm:h-9 sm:w-9"}
         />
 
         {resolvedImage && (
@@ -80,22 +80,22 @@ export function AnswerCard({
             alt=""
             className={
               isPlayer
-                ? "h-16 w-16 shrink-0 rounded-lg bg-white/20 object-cover sm:h-20 sm:w-20"
+                ? "h-12 w-12 shrink-0 rounded-lg bg-white/20 object-cover sm:h-16 sm:w-16"
                 : "h-14 w-14 shrink-0 rounded-lg bg-white/20 object-cover sm:h-16 sm:w-16"
             }
           />
         )}
 
         <span
-          className={`flex-1 text-left font-extrabold leading-tight drop-shadow-sm ${
-            isPlayer ? "text-lg sm:text-2xl" : "text-xl sm:text-2xl xl:text-3xl"
+          className={`flex-1 text-left font-extrabold leading-snug drop-shadow-sm break-words ${
+            isPlayer ? "text-sm sm:text-lg md:text-xl" : "text-lg sm:text-2xl xl:text-3xl"
           }`}
         >
           {text}
         </span>
 
         {showVotes && (
-          <span className="relative shrink-0 rounded-full bg-black/35 px-3 py-1 text-sm font-bold tabular-nums sm:text-base">
+          <span className="relative shrink-0 rounded-full bg-black/35 px-2.5 py-0.5 text-xs font-bold tabular-nums sm:px-3 sm:py-1 sm:text-base">
             {votes}
           </span>
         )}
@@ -103,8 +103,8 @@ export function AnswerCard({
     </>
   );
 
-  const base = `relative flex w-full items-center overflow-hidden rounded-2xl px-4 py-4 text-white transition-all duration-200 ${
-    isPlayer ? "min-h-[84px] sm:min-h-[104px]" : "py-5"
+  const base = `relative flex w-full items-center overflow-hidden rounded-2xl px-3.5 py-3 sm:px-5 sm:py-4 text-white transition-all duration-200 ${
+    isPlayer ? "min-h-[58px] sm:min-h-[80px]" : "py-4 sm:py-5"
   }`;
 
   if (Tag === "button") {

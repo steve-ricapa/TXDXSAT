@@ -64,7 +64,7 @@ COPY prisma.config.ts package.json ./
 COPY docker-entrypoint.sh ./
 # Create the storage mountpoint owned by the runtime user so the named volume
 # inherits writable ownership on first use.
-RUN chmod +x docker-entrypoint.sh && mkdir -p /app/storage && chown -R node:node /app
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh && mkdir -p /app/storage && chown -R node:node /app
 
 USER node
 EXPOSE 4000

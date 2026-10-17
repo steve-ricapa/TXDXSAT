@@ -70,8 +70,8 @@ export function createApiRouter(deps: AppDependencies): Router {
       requireAuth,
     ),
     publicWhen(
-      (req) => req.method === "GET" && (/^\/sessions\/[^/]+\/results\/?$/.test(req.path) || /^\/me\/results\/?$/.test(req.path)),
-      requireRole("SUPERADMIN"),
+      (req) => req.method === "GET" && (/^\/sessions\/[^/]+\/results\/?$/.test(req.path) || /^\/me\/results(?:\/[^/]+)?\/?$/.test(req.path)),
+      requireRole("ADMIN", "SUPERADMIN"),
     ),
     live.router,
   );

@@ -73,9 +73,14 @@ export function HostPage() {
       setStartPending(false);
     };
     socket.on(ServerEvents.error, onError);
-    socket.emit(ClientEvents.hostJoin, { sessionId, hostToken });
+    const join = () => socket.emit(ClientEvents.hostJoin, { sessionId, hostToken });
+    if (socket.connected) join();
+    socket.on("connect", join);
+
     return () => {
+      joinedRef.current = false;
       socket.off(ServerEvents.error, onError);
+      socket.off("connect", join);
     };
   }, [hostToken, sessionId]);
 
@@ -300,6 +305,12 @@ export function HostPage() {
 
       <div className="relative z-0 grid min-h-0 flex-1 gap-4 px-5 pb-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <main className="flex min-h-0 flex-col gap-4">
+          {!state && !error && (
+            <div className="game-panel flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl p-8 text-center">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+              <p className="mt-4 text-base font-bold text-ink-muted">Cargando sesión…</p>
+            </div>
+          )}
           {status === "WAITING" && !ended && (
             <div className="min-h-0 flex-1">
               <Lobby
@@ -373,8 +384,8 @@ export function HostPage() {
           )}
 
           {ended && (
-            <div className="game-panel relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto rounded-3xl p-6">
-              <div className="my-auto flex w-full max-w-4xl flex-col items-center py-4">
+            <div className="game-panel relative min-h-0 flex-1 overflow-y-auto rounded-3xl p-6">
+              <div className="flex min-h-full w-full flex-col items-center justify-center py-6">
                 <h2 className="mb-6 text-center text-3xl font-black text-ink">🏆 Resultado final</h2>
                 <Podium podium={ended.podium} leaderboard={ended.leaderboard} />
                 <div className="mt-8 flex justify-center">

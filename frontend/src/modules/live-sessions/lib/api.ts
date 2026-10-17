@@ -41,13 +41,30 @@ export interface MyLiveResult {
   status: "WAITING" | "ACTIVE" | "FINISHED";
   score: number;
   answers: number;
-  correctCount?: number;
-  accuracyRate?: number;
+  correctCount: number;
+  accuracyRate: number;
+  joinedAt: string;
   finishedAt: string | null;
+}
+
+export interface MyLiveResultDetail extends MyLiveResult {
+  incorrectCount: number;
+  questions: Array<{
+    questionId: string;
+    questionText: string | null;
+    explanation: string | null;
+    isCorrect: boolean;
+    score: number;
+    answerOrder: number;
+  }>;
 }
 
 export function myLiveResults(): Promise<{ results: MyLiveResult[] }> {
   return api.get("/live/me/results");
+}
+
+export function myLiveResultDetail(sessionId: string): Promise<{ result: MyLiveResultDetail }> {
+  return api.get(`/live/me/results/${sessionId}`);
 }
 
 /** A question as sent to the authoring API (server validates with Zod). */

@@ -225,10 +225,6 @@ export class GameEngine {
       throw new ForbiddenError("This session belongs to another organization");
     }
 
-    if (session.status === "FINISHED") {
-      throw new ConflictError("This session has already finished");
-    }
-
     let player: EnginePlayer | undefined;
     let reconnected = false;
 
@@ -238,7 +234,16 @@ export class GameEngine {
         throw new ForbiddenError("Player does not belong to this account");
       }
     }
-    player = [...session.players.values()].find((candidate) => candidate.userId === input.userId);
+    player = [...session.players.values()].find((candidate) => candidate.userId === input.userId)
+      ?? (input.playerId ? session.players.get(input.playerId) : undefined);
+
+    if (session.status === "FINISHED") {
+      if (!player) {
+        throw new ConflictError("This session has already finished");
+      }
+      return { session, player, reconnected: true };
+    }
+
     // Display names are mutable, but must never collide with another player.
     const clash = [...session.players.values()].some(
       (candidate) => candidate.userId !== input.userId && normalizeText(candidate.username) === normalizeText(username),

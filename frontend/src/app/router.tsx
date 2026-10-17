@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { HomePage } from "./HomePage";
 import { EmployeeHome } from "@/modules/employee/pages/EmployeeHome";
+import { EmployeeHistory } from "@/modules/employee/pages/EmployeeHistory";
 import { AdminHome } from "@/modules/enterprise-admin/pages/AdminHome";
 import { SuperAdminHome } from "@/modules/superadmin/pages/SuperAdminHome";
 import { LoginPage } from "@/modules/auth/pages/LoginPage";
@@ -45,6 +46,7 @@ export const router = createBrowserRouter(
       element: <AppShell />,
       children: [
         { path: "employee", element: <ProtectedRoute><EmployeeHome /></ProtectedRoute> },
+        { path: "employee/history", element: <ProtectedRoute><EmployeeHistory /></ProtectedRoute> },
         {
           path: "admin",
           element: (
@@ -88,12 +90,19 @@ export const router = createBrowserRouter(
     {
       path: "live/host",
       element: (
-        <ProtectedRoute roles={["SUPERADMIN"]}>
+        <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
           <HostPage />
         </ProtectedRoute>
       ),
     },
-    { path: "live/host/:sessionId", element: <HostPage /> },
+    {
+      path: "live/host/:sessionId",
+      element: (
+        <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
+          <HostPage />
+        </ProtectedRoute>
+      ),
+    },
     { path: "live/present/:sessionId", element: <PresentPage /> },
   ],
   { basename: resolveBasename(import.meta.env.BASE_URL) },

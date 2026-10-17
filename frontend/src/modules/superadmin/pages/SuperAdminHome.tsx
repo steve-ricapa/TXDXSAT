@@ -1,12 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  AlertTriangle,
-  ArrowRight,
   BookOpen,
   Building2,
   CheckCircle2,
-  Loader2,
   Pencil,
   Radio,
   RefreshCw,
@@ -21,6 +18,8 @@ import { Button, Card, LoadingState, StatCard } from "@/components/ui";
 import { tenantsApi, type TenantSummary } from "@/modules/tenants/lib/api";
 import { liveApi, type QuizSummary, type CreateSessionResult } from "@/modules/live-sessions/lib/api";
 import { useAuth } from "@/modules/auth/context/AuthContext";
+import { UsersPage } from "@/modules/auth/pages/UsersPage";
+import { OrganizationManager } from "../OrganizationManager";
 
 // ─── Launch Modal ────────────────────────────────────────────────────────────
 
@@ -226,9 +225,11 @@ interface TenantCardProps {
   tenant: TenantSummary;
   onLaunch: (tenant: TenantSummary) => void;
   onViewAdmin: (tenant: TenantSummary) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-function TenantCard({ tenant, onLaunch, onViewAdmin }: TenantCardProps) {
+function TenantCard({ tenant, onLaunch, onViewAdmin, onEdit, onDelete }: TenantCardProps) {
   const { stats } = tenant;
   return (
     <Card className="group flex flex-col gap-5 p-5 transition-shadow hover:shadow-lg hover:shadow-black/30">
@@ -236,9 +237,13 @@ function TenantCard({ tenant, onLaunch, onViewAdmin }: TenantCardProps) {
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
           <Building2 className="h-5 w-5" />
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-bold text-ink">{tenant.name}</p>
           <p className="text-xs font-mono text-ink-muted">{tenant.slug}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button type="button" onClick={onEdit} className="rounded-md px-2 py-1 text-xs font-semibold text-info hover:bg-info/10">Editar</button>
+          <button type="button" onClick={onDelete} className="rounded-md px-2 py-1 text-xs font-semibold text-danger-readable hover:bg-danger/10">Eliminar</button>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2 border-y border-border py-4">
@@ -452,96 +457,27 @@ export function SuperAdminHome() {
       {/* Tenants grid */}
       {activeView === "tenants" && (
         <div className="space-y-4">
-          {loading ? (
-            <div className="py-16 text-center">
-              <LoadingState label="Cargando organizaciones..." />
-            </div>
-          ) : error ? (
-            <div className="flex items-center gap-3 rounded-xl border border-danger/30 bg-danger/10 p-5 text-sm text-danger-readable">
-              <AlertTriangle className="h-5 w-5 shrink-0" />
-              {error}
-            </div>
-          ) : tenants.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-10 text-center text-ink-muted">
-              <Building2 className="mx-auto mb-3 h-10 w-10 opacity-40" />
-              <p className="font-semibold">Sin organizaciones</p>
-              <p className="mt-1 text-sm">No hay tenants registrados aún.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tenants.map((tenant) => (
+          <OrganizationManager
+            tenants={tenants}
+            reload={load}
+            loading={loading}
+            loadError={error}
+            renderTenantCard={(tenant, actions) => (
                 <TenantCard
                   key={tenant.id}
                   tenant={tenant}
                   onLaunch={(t) => setSelectedTenant(t)}
                   onViewAdmin={handleViewAdmin}
+                  onEdit={actions.onEdit}
+                  onDelete={actions.onDelete}
                 />
-              ))}
-            </div>
-          )}
+            )}
+          />
         </div>
       )}
 
       {/* Users management */}
-      {activeView === "users" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-ink-muted">
-              Resumen de usuarios por organización. Ve a la gestión completa para crear, activar o eliminar cuentas.
-            </p>
-            <Link
-              to="/account"
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-ink-muted transition-colors hover:border-accent hover:text-ink"
-            >
-              <ArrowRight className="h-3.5 w-3.5" />
-              Ir a gestión completa
-            </Link>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            <div className="border-b border-border bg-surface-raised/60 px-5 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                Resumen por organización
-              </p>
-            </div>
-            <div className="divide-y divide-border">
-              {loading ? (
-                <div className="p-8 text-center">
-                  <Loader2 className="mx-auto h-6 w-6 animate-spin text-accent" />
-                </div>
-              ) : (
-                tenants.map((tenant) => (
-                  <div key={tenant.id} className="flex items-center justify-between px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent text-sm font-bold">
-                        {tenant.name.charAt(0)}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-ink">{tenant.name}</p>
-                        <p className="text-xs font-mono text-ink-muted">{tenant.slug}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-ink-muted">
-                        <span className="font-bold text-ink">{tenant.stats.adminCount}</span> admins
-                      </span>
-                      <span className="text-ink-muted">
-                        <span className="font-bold text-ink">{tenant.stats.employeeCount}</span> colaboradores
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleViewAdmin(tenant)}
-                        className="flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
-                      >
-                        Ver dashboard <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {activeView === "users" && <UsersPage tenants={tenants} />}
 
       {/* Launch Session Modal */}
       {selectedTenant && (

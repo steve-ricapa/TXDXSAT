@@ -519,8 +519,64 @@ export class LiveSessionRepository implements LiveSessionStore {
         answers: totalAnswers,
         correctCount,
         accuracyRate,
+        joinedAt: row.joinedAt.toISOString(),
         finishedAt: row.session.finishedAt?.toISOString() ?? null,
       };
     });
+  }
+
+  async getResultDetailForUser(userId: string, tenantId: string | null, sessionId: string) {
+    const player = await prisma.livePlayer.findFirst({
+      where: { userId, sessionId, ...(tenantId ? { tenantId } : {}) },
+      select: {
+        score: true,
+        joinedAt: true,
+        session: {
+          select: {
+            id: true,
+            status: true,
+            finishedAt: true,
+            quiz: {
+              select: {
+                title: true,
+                questions: { select: { id: true, text: true, explanation: true } },
+              },
+            },
+          },
+        },
+        answers: {
+          orderBy: { answerOrder: "asc" },
+          select: { questionId: true, answerOrder: true, isCorrect: true, score: true },
+        },
+      },
+    });
+    if (!player || player.session.status !== "FINISHED") return null;
+
+    const questionById = new Map(player.session.quiz.questions.map((question) => [question.id, question]));
+    const answers = player.answers.length;
+    const correctCount = player.answers.filter((answer) => answer.isCorrect).length;
+    return {
+      sessionId: player.session.id,
+      quizTitle: player.session.quiz.title,
+      status: "FINISHED" as const,
+      score: player.score,
+      answers,
+      correctCount,
+      incorrectCount: answers - correctCount,
+      accuracyRate: answers ? Math.round((correctCount / answers) * 100) : 0,
+      joinedAt: player.joinedAt.toISOString(),
+      finishedAt: player.session.finishedAt?.toISOString() ?? null,
+      questions: player.answers.map((answer) => {
+        const question = questionById.get(answer.questionId);
+        return {
+          questionId: answer.questionId,
+          questionText: question?.text ?? null,
+          explanation: question?.explanation ?? null,
+          isCorrect: answer.isCorrect,
+          score: answer.score,
+          answerOrder: answer.answerOrder,
+        };
+      }),
+    };
   }
 }

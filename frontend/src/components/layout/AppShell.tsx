@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   GraduationCap,
   Home,
+  History,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -42,15 +43,23 @@ const ROLE_LABEL: Record<UserRole, string> = {
 function buildNavigation(role: UserRole | undefined): NavSection[] {
   const general: NavItem[] = [
     { to: "/", label: "Sitio público", icon: Home, end: true },
-    { to: "/employee", label: "Mi capacitación", icon: GraduationCap },
+    { to: "/employee", label: "Mi capacitación", icon: GraduationCap, end: true },
   ];
+
+  if (role === "EMPLOYEE") {
+    general.push({ to: "/employee/history", label: "Historial de sesiones", icon: History });
+  }
 
   const sections: NavSection[] = [{ title: "General", items: general }];
 
   if (role === "ADMIN" || role === "SUPERADMIN") {
     sections.push({
       title: "Operación",
-      items: [{ to: "/admin", label: "Panel", icon: LayoutDashboard }],
+      items: [
+        { to: "/admin", label: "Panel", icon: LayoutDashboard },
+        { to: "/live/host", label: "Sesiones en vivo", icon: Radio },
+        { to: "/live/editor", label: "Editor de quizzes", icon: Pencil },
+      ],
     });
   }
 
@@ -58,9 +67,7 @@ function buildNavigation(role: UserRole | undefined): NavSection[] {
     sections.push({
       title: "Administración",
       items: [
-        { to: "/superadmin", label: "Usuarios", icon: Users },
-        { to: "/live/host", label: "Sesiones en vivo", icon: Radio },
-        { to: "/live/editor", label: "Editor de quizzes", icon: Pencil },
+        { to: "/superadmin", label: "Usuarios y Empresas", icon: Users },
       ],
     });
   }
@@ -205,7 +212,7 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-[var(--color-surface)] transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-[var(--color-surface)] transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:self-start lg:z-auto lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full",
       )}
     >

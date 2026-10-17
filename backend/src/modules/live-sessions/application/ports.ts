@@ -76,8 +76,31 @@ export interface LiveSessionStore {
     status: LiveSessionStatus;
     score: number;
     answers: number;
+    correctCount: number;
+    accuracyRate: number;
+    joinedAt: string;
     finishedAt: string | null;
   }>>;
+  getResultDetailForUser(userId: string, tenantId: string | null, sessionId: string): Promise<{
+    sessionId: string;
+    quizTitle: string;
+    status: "FINISHED";
+    score: number;
+    answers: number;
+    correctCount: number;
+    incorrectCount: number;
+    accuracyRate: number;
+    joinedAt: string;
+    finishedAt: string | null;
+    questions: Array<{
+      questionId: string;
+      questionText: string | null;
+      explanation: string | null;
+      isCorrect: boolean;
+      score: number;
+      answerOrder: number;
+    }>;
+  } | null>;
   upsertPlayer(input: {
     sessionId: string;
     tenantId: string | null;

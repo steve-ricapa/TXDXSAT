@@ -175,6 +175,9 @@ export class CreateUserUseCase {
     const parsed = parseOrThrow(createUserSchema, input);
     const existing = await this.store.findUserByEmail(parsed.email);
     if (existing) throw new ConflictError("An account with that email already exists");
+    if (parsed.tenantId && !await this.store.tenantExists(parsed.tenantId)) {
+      throw new ValidationError("La organización seleccionada no existe");
+    }
 
     const passwordHash = await hashPassword(parsed.password);
     return this.store.createUser({
@@ -211,6 +214,9 @@ export class UpdateUserUseCase {
     if ((patch.role ?? target.role) === "EMPLOYEE" && !(patch.tenantId !== undefined ? patch.tenantId : target.tenantId)) {
       throw new ValidationError("Employee accounts require a tenant ID");
     }
+    if (patch.tenantId && !await this.store.tenantExists(patch.tenantId)) {
+      throw new ValidationError("La organización seleccionada no existe");
+    }
 
     const update: Parameters<AuthStore["updateUser"]>[1] = {};
     if (patch.name !== undefined) update.name = patch.name;
@@ -244,6 +250,9 @@ export class DeleteUserUseCase {
     if (target.role === "SUPERADMIN") {
       const total = await this.store.countSuperadmins();
       if (total <= 1) throw new ValidationError("At least one superadmin must remain");
+    }
+    if (await this.store.hasUserActivity(id)) {
+      throw new ValidationError("No se puede eliminar una cuenta con participación en sesiones; desactívala en su lugar");
     }
     await this.store.deleteUser(id);
   }

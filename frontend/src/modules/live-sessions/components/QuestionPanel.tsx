@@ -141,7 +141,7 @@ export function QuestionPanel({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className={`grid flex-1 content-stretch gap-3 ${twoOptions ? "grid-cols-1" : "grid-cols-1"}`}>
+      <div className={`grid flex-1 content-stretch gap-2.5 sm:gap-3.5 ${twoOptions ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2"}`}>
         {slots.map((slot) => {
           const isSelected = selected.includes(slot);
           return (

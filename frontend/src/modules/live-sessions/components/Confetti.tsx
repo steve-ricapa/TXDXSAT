@@ -43,9 +43,22 @@ export function Confetti({
 
   const container = (
     <div
-      className={`pointer-events-none overflow-hidden ${
-        fixed ? "fixed inset-0 z-50 h-screen w-screen" : "absolute inset-0"
-      } ${className}`}
+      className={`pointer-events-none overflow-hidden ${className}`}
+      style={
+        fixed
+          ? {
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: "100vw",
+              height: "100vh",
+              zIndex: 9999,
+              pointerEvents: "none",
+            }
+          : { position: "absolute", inset: 0, pointerEvents: "none" }
+      }
       aria-hidden
     >
       {items.map((item) => (

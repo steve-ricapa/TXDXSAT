@@ -37,6 +37,8 @@ export interface ListUsersFilter {
  */
 export interface AuthStore {
   countUsers(): Promise<number>;
+  tenantExists(id: string): Promise<boolean>;
+  hasUserActivity(id: string): Promise<boolean>;
 
   findUserByEmail(email: string): Promise<UserWithSecret | null>;
   findUserById(id: string): Promise<UserWithSecret | null>;

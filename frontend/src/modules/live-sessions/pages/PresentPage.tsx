@@ -49,9 +49,14 @@ export function PresentPage() {
     const socket = getSocket();
     const onError = (payload: { message?: string }) => setError(payload?.message ?? "Error");
     socket.on(ServerEvents.error, onError);
-    socket.emit(ClientEvents.presentJoin, { sessionId, viewToken });
+    const join = () => socket.emit(ClientEvents.presentJoin, { sessionId, viewToken });
+    if (socket.connected) join();
+    socket.on("connect", join);
+
     return () => {
+      joinedRef.current = false;
       socket.off(ServerEvents.error, onError);
+      socket.off("connect", join);
     };
   }, [viewToken, sessionId]);
 

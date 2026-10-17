@@ -110,7 +110,7 @@ export function JoinPage() {
               inputMode="numeric"
               autoComplete="off"
               placeholder="000000"
-              className="mt-1 w-full rounded-2xl border border-border bg-[var(--color-field)] px-4 py-3 text-center text-3xl font-black tracking-[0.5em] text-ink placeholder:text-ink-soft focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-2xl border border-border bg-[var(--color-field)] px-3 py-3 text-center text-2xl sm:text-3xl font-black tracking-[0.25em] sm:tracking-[0.4em] text-ink placeholder:text-ink-soft focus:border-accent focus:outline-none"
             />
           </label>
 

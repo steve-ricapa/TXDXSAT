@@ -60,6 +60,14 @@ export class AuthRepository implements AuthStore {
     return prisma.user.count();
   }
 
+  async tenantExists(id: string): Promise<boolean> {
+    return (await prisma.tenant.count({ where: { id } })) > 0;
+  }
+
+  async hasUserActivity(id: string): Promise<boolean> {
+    return (await prisma.livePlayer.count({ where: { userId: id } })) > 0;
+  }
+
   async findUserByEmail(email: string): Promise<UserWithSecret | null> {
     const row = await prisma.user.findUnique({ where: { email } });
     return row ? mapUserWithSecret(row) : null;
