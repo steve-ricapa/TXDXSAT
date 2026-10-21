@@ -17,6 +17,7 @@ interface UserRow {
   name: string;
   role: string;
   isActive: boolean;
+  enrollmentStatus: "APPROVED" | "PENDING" | "REJECTED";
   lastLoginAt: Date | null;
   createdAt: Date;
 }
@@ -36,6 +37,7 @@ function mapUser(row: UserRow): AuthUser {
     name: row.name,
     role: row.role as UserRole,
     isActive: row.isActive,
+    enrollmentStatus: row.enrollmentStatus,
     lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
   };

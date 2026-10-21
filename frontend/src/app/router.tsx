@@ -7,6 +7,8 @@ import { AdminHome } from "@/modules/enterprise-admin/pages/AdminHome";
 import { SuperAdminHome } from "@/modules/superadmin/pages/SuperAdminHome";
 import { LoginPage } from "@/modules/auth/pages/LoginPage";
 import { AccountPage } from "@/modules/auth/pages/AccountPage";
+import { EnrollmentManagerPage } from "@/modules/auth/pages/EnrollmentManagerPage";
+import { EnrollmentRegisterPage } from "@/modules/auth/pages/EnrollmentRegisterPage";
 import { ProtectedRoute } from "@/modules/auth/components/ProtectedRoute";
 import { useAuth } from "@/modules/auth/context/AuthContext";
 import { JoinPage } from "@/modules/live-sessions/pages/JoinPage";
@@ -77,6 +79,7 @@ export const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        { path: "admin/enrollment", element: <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}><EnrollmentManagerPage /></ProtectedRoute> },
         {
           path: "live/editor",
           element: (
@@ -90,6 +93,7 @@ export const router = createBrowserRouter(
     },
     // Login renders full-screen, outside the corporate shell.
     { path: "login", element: <LoginPage /> },
+    { path: "register/:token", element: <EnrollmentRegisterPage /> },
     // Players must be authenticated; host/presenter retain their capability tokens.
     { path: "live/join", element: <ProtectedRoute><JoinPage /></ProtectedRoute> },
     { path: "live/play/:sessionId", element: <ProtectedRoute><PlayPage /></ProtectedRoute> },

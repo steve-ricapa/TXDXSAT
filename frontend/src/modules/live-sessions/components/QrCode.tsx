@@ -7,7 +7,7 @@ import QRCode from "qrcode";
  *
  * Kept on a white tile: the quiet zone is required for reliable scanning.
  */
-export function QrCode({ value, size = 200 }: { value: string; size?: number }) {
+export function QrCode({ value, size = 200, alt = "Código QR para unirse" }: { value: string; size?: number; alt?: string }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,5 +34,5 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
       </div>
     );
   }
-  return <img src={dataUrl} alt="Código QR para unirse" width={size} height={size} className="rounded-xl bg-white p-1" />;
+  return <img src={dataUrl} alt={alt} width={size} height={size} className="rounded-xl bg-white p-1" />;
 }

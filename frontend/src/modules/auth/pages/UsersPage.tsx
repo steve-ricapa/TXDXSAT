@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Pencil, Power, RefreshCw, Search, Shield, ShieldCheck, Trash2, UserPlus, UsersRound } from "lucide-react";
 import { ApiError } from "@/services/api-client";
 import {
@@ -45,8 +46,8 @@ function formatDate(value: string | null): string {
 }
 
 /**
- * Superadmin console: the single place where administrator accounts are
- * created, activated/deactivated and removed. There is no public registration.
+ * Superadmin console for direct account management. Invitation-based employee
+ * enrollment is managed separately and always requires approval.
  */
 export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
   const { user: currentUser } = useAuth();
@@ -194,11 +195,15 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink">Cuentas de la plataforma</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Solo un superadmin puede crear cuentas. Los colaboradores necesitan el ID de su organización.
+            Crea cuentas directamente o invita colaboradores mediante un QR para que soliciten acceso.
           </p>
         </div>
         <Badge variant="accent">{users.length} cuentas</Badge>
       </header>
+
+      <Link to="/admin/enrollment" className="inline-flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent hover:bg-accent/20">
+        Crear QR de registro y revisar solicitudes <ChevronRight className="h-4 w-4" />
+      </Link>
 
       <Card>
         <CardHeader>
@@ -360,8 +365,8 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
                       <Td className="text-ink-muted">{item.email}</Td>
                       <Td className="text-ink-muted">{tenants.find((tenant) => tenant.id === item.tenantId)?.name ?? (item.tenantId ?? "Plataforma")}</Td>
                       <Td>
-                        <Badge variant={item.isActive ? "success" : "danger"}>
-                          {item.isActive ? "Activo" : "Inactivo"}
+                        <Badge variant={item.enrollmentStatus === "PENDING" ? "warning" : item.isActive ? "success" : "danger"}>
+                          {item.enrollmentStatus === "PENDING" ? "Pendiente" : item.enrollmentStatus === "REJECTED" ? "Rechazado" : item.isActive ? "Activo" : "Inactivo"}
                         </Badge>
                       </Td>
                       <Td className="text-ink-muted">{formatDate(item.lastLoginAt)}</Td>
@@ -379,7 +384,7 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
                           <Button
                             variant="secondary"
                             size="sm"
-                            disabled={isSelf}
+                            disabled={isSelf || item.enrollmentStatus !== "APPROVED"}
                             onClick={() => void toggleActive(item)}
                             leftIcon={<Power className="h-3.5 w-3.5" />}
                             className="text-amber-300 hover:text-amber-200"

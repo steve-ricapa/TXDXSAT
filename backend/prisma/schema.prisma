@@ -100,6 +100,12 @@ enum UserRole {
   EMPLOYEE
 }
 
+enum EnrollmentStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
 model User {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String?   @map("tenant_id") @db.Uuid
@@ -108,6 +114,7 @@ model User {
   name         String    @db.VarChar(120)
   role         UserRole  @default(ADMIN)
   isActive     Boolean   @default(true) @map("is_active")
+  enrollmentStatus EnrollmentStatus @default(APPROVED) @map("enrollment_status")
   lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(6)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -115,8 +122,26 @@ model User {
   livePlayers  LivePlayer[]
   questionBanks QuestionBank[]
   createdQuizzes Quiz[]
+  enrollmentInvites EnrollmentInvite[]
   @@index([tenantId])
   @@map("users")
+}
+
+model EnrollmentInvite {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique @map("token_hash") @db.VarChar(64)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  maxUses     Int      @default(100) @map("max_uses")
+  uses        Int      @default(0)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, createdAt])
+  @@map("enrollment_invites")
 }
 
 model Session {
@@ -318,6 +343,7 @@ model Tenant {
   slug      String   @unique @db.VarChar(60)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  enrollmentInvites EnrollmentInvite[]
 
   @@map("tenants")
 }

@@ -1,8 +1,8 @@
 /**
  * Auth module domain types.
  *
- * There is deliberately **no self-registration**: every account is provisioned
- * by a SUPERADMIN. Roles are:
+ * Direct accounts are provisioned by a SUPERADMIN; invited employees may
+ * request registration but cannot access the platform until approved. Roles:
  *   * `SUPERADMIN` — platform operator; may create/manage every account.
  *   * `ADMIN`      — company administrator (optionally bound to a tenant).
  *   * `EMPLOYEE`   — company participant, always bound to a tenant.
@@ -25,6 +25,7 @@ export interface AuthUser {
   name: string;
   role: UserRole;
   isActive: boolean;
+  enrollmentStatus: "APPROVED" | "PENDING" | "REJECTED";
   lastLoginAt: string | null;
   createdAt: string;
 }

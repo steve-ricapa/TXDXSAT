@@ -33,8 +33,8 @@ function loginDestination(user: AuthUser, requestedPath: unknown): string {
 }
 
 /**
- * Login screen. There is deliberately no registration link: accounts are
- * provisioned by a superadmin.
+ * Login screen. Invitation-based registration uses a separate link/QR and
+ * requires administrator approval before login.
  */
 export function LoginPage() {
   const { user, status, login } = useAuth();

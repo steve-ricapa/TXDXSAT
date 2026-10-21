@@ -106,7 +106,9 @@ export class LoginUseCase {
 
     const matches = await verifyPassword(parsed.password, user.passwordHash);
     if (!matches) throw invalid();
-    if (!user.isActive) throw new ForbiddenError("This account is disabled");
+    if (user.enrollmentStatus === "PENDING") throw new ForbiddenError("Tu solicitud de registro está pendiente de aprobación");
+    if (user.enrollmentStatus === "REJECTED") throw new ForbiddenError("Tu solicitud de registro fue rechazada");
+    if (!user.isActive) throw new ForbiddenError("Esta cuenta está desactivada");
 
     const token = generateToken();
     const expiresAt = new Date(Date.now() + env.SESSION_TTL_HOURS * 60 * 60 * 1000);
@@ -165,8 +167,8 @@ export class ListUsersUseCase {
 /**
  * Use case: create an account (SUPERADMIN only).
  *
- * This is the *only* way an account comes into existence — there is no public
- * registration endpoint.
+ * Invited collaborators can also request an inactive account; only this use
+ * case creates immediately active accounts.
  */
 export class CreateUserUseCase {
   constructor(private readonly store: AuthStore) {}
@@ -202,6 +204,11 @@ export class UpdateUserUseCase {
     const target = await this.store.findUserById(id);
     if (!target) throw new NotFoundError("User not found");
     const patch = parseOrThrow(updateUserSchema, input);
+    if (target.enrollmentStatus !== "APPROVED" &&
+      (patch.isActive === true || (patch.role !== undefined && patch.role !== "EMPLOYEE") ||
+        (patch.tenantId !== undefined && patch.tenantId !== target.tenantId))) {
+      throw new ValidationError("Las solicitudes deben aprobarse desde Invitaciones y registros");
+    }
 
     // A superadmin must not strand the platform without an operator, and must
     // not lock themselves out by mistake.

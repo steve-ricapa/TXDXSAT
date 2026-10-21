@@ -8,6 +8,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  QrCode,
   Pencil,
   Radio,
   ShieldCheck,
@@ -56,9 +57,10 @@ function buildNavigation(role: UserRole | undefined): NavSection[] {
     sections.push({
       title: "Operación",
       items: [
-        { to: "/admin", label: "Panel", icon: LayoutDashboard },
+        { to: "/admin", label: "Panel", icon: LayoutDashboard, end: true },
         { to: "/live/host", label: "Sesiones en vivo", icon: Radio },
         { to: "/live/editor", label: "Editor de quizzes", icon: Pencil },
+        { to: "/admin/enrollment", label: "Invitaciones y registros", icon: QrCode },
       ],
     });
   }

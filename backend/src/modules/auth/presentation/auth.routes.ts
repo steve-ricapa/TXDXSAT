@@ -1,7 +1,17 @@
 import { Router, type Request, type RequestHandler, type Response } from "express";
 import type { AuthenticatedRequest } from "./auth.middleware.ts";
 import type { AuthMiddleware } from "./auth.middleware.ts";
-import { NotFoundError, UnauthorizedError } from "../../../shared/errors/app-error.ts";
+import { NotFoundError, TooManyRequestsError, UnauthorizedError, ValidationError } from "../../../shared/errors/app-error.ts";
+import {
+  createEnrollmentInvite,
+  decideEnrollment,
+  getEnrollmentInvite,
+  listEnrollmentInvites,
+  listPendingEnrollments,
+  listTenantEmployees,
+  registerFromInvite,
+  revokeEnrollmentInvite,
+} from "../application/enrollment.ts";
 import { isUuid } from "../../../shared/utils/id.ts";
 import type { AuthUser } from "../domain/types.ts";
 import type {
@@ -53,13 +63,25 @@ function routeId(req: Request): string {
 /**
  * REST surface of the auth module (mounted at `/api/v1/auth`).
  *
- * There is no registration endpoint: accounts are created exclusively by a
- * SUPERADMIN through `POST /users`.
+ * Direct account creation remains restricted to SUPERADMIN. Enrollment links
+ * can only create inactive EMPLOYEE accounts pending tenant approval.
  */
 export function createAuthRouter(deps: AuthRouterDeps): Router {
   const router = Router();
   const { requireAuth, requireRole } = deps.middleware;
   const superadminOnly: RequestHandler[] = [requireAuth, requireRole("SUPERADMIN")];
+  const managerOnly: RequestHandler[] = [requireAuth, requireRole("ADMIN", "SUPERADMIN")];
+  const attempts = new Map<string, { count: number; until: number }>();
+  const limitRegistration: RequestHandler = (req, _res, next) => {
+    const key = clientIp(req) ?? "unknown";
+    const now = Date.now();
+    const current = attempts.get(key);
+    const nextAttempt = !current || current.until < now ? { count: 1, until: now + 15 * 60_000 } : { count: current.count + 1, until: current.until };
+    attempts.set(key, nextAttempt);
+    if (attempts.size > 5000) for (const [ip, value] of attempts) if (value.until < now) attempts.delete(ip);
+    if (nextAttempt.count > 500) return next(new TooManyRequestsError("Demasiados intentos de registro. Espera unos minutos."));
+    next();
+  };
 
   router.post(
     "/login",
@@ -71,6 +93,47 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
       res.json(result);
     }),
   );
+
+  router.get("/enrollment/:token", asyncHandler(async (req, res) => {
+    res.json(await getEnrollmentInvite(String(req.params.token)));
+  }));
+
+  router.post("/enrollment/:token", limitRegistration, asyncHandler(async (req, res) => {
+    res.status(201).json(await registerFromInvite(String(req.params.token), req.body));
+  }));
+
+  router.get("/enrollment-invites", ...managerOnly, asyncHandler(async (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
+    res.json({ invites: await listEnrollmentInvites(currentUser(req), tenantId) });
+  }));
+
+  router.post("/enrollment-invites", ...managerOnly, asyncHandler(async (req, res) => {
+    res.status(201).json(await createEnrollmentInvite(currentUser(req), req.body));
+  }));
+
+  router.delete("/enrollment-invites/:id", ...managerOnly, asyncHandler(async (req, res) => {
+    const id = String(req.params.id);
+    if (!isUuid(id)) throw new ValidationError("Invitación inválida");
+    await revokeEnrollmentInvite(currentUser(req), id);
+    res.status(204).end();
+  }));
+
+  router.get("/enrollments/pending", ...managerOnly, asyncHandler(async (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
+    res.json({ users: await listPendingEnrollments(currentUser(req), tenantId) });
+  }));
+
+  router.get("/enrollments/users", ...managerOnly, asyncHandler(async (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
+    res.json({ users: await listTenantEmployees(currentUser(req), tenantId) });
+  }));
+
+  router.post("/enrollments/:id/decision", ...managerOnly, asyncHandler(async (req, res) => {
+    const id = String(req.params.id);
+    if (!isUuid(id) || (req.body?.decision !== "approve" && req.body?.decision !== "reject")) throw new ValidationError("Decisión inválida");
+    await decideEnrollment(currentUser(req), id, req.body.decision);
+    res.status(204).end();
+  }));
 
   router.post(
     "/logout",
