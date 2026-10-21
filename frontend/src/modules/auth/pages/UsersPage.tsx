@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Pencil, Power, RefreshCw, Trash2, UserPlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Power, RefreshCw, Search, Shield, ShieldCheck, Trash2, UserPlus, UsersRound } from "lucide-react";
 import { ApiError } from "@/services/api-client";
 import {
   Alert,
@@ -32,6 +32,13 @@ const ROLE_LABEL: Record<UserRole, string> = {
   EMPLOYEE: "Colaborador",
 };
 
+const ROLE_TABS = [
+  { role: "ADMIN", label: "Administradores", icon: Shield },
+  { role: "EMPLOYEE", label: "Colaboradores", icon: UsersRound },
+  { role: "SUPERADMIN", label: "Superadmins", icon: ShieldCheck },
+] as const;
+const PAGE_SIZE = 8;
+
 function formatDate(value: string | null): string {
   if (!value) return "—";
   return new Date(value).toLocaleString();
@@ -46,6 +53,9 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeRole, setActiveRole] = useState<UserRole>("ADMIN");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -84,6 +94,9 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
         ...(editPassword ? { password: editPassword } : {}),
       });
       setEditing(null);
+      setActiveRole(editRole);
+      setSearch("");
+      setPage(1);
       await load();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "No se pudo actualizar la cuenta");
@@ -118,6 +131,9 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
       const account = { email: email.trim(), role, tenantName: tenants.find((tenant) => tenant.id === tenantId)?.name ?? null };
       await authApi.createUser({ name: name.trim(), email: account.email, password, role, tenantId: tenantId.trim() || null });
       setCreateSuccess(account);
+      setActiveRole(role);
+      setSearch("");
+      setPage(1);
       setName("");
       setEmail("");
       setPassword("");
@@ -160,6 +176,17 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
       setError(err instanceof ApiError ? err.message : "No se pudo eliminar el usuario");
     }
   }
+
+  const roleUsers = users.filter((item) => item.role === activeRole);
+  const normalizedSearch = search.trim().toLocaleLowerCase("es");
+  const matchingUsers = roleUsers.filter((item) => {
+    const tenantName = tenants.find((tenant) => tenant.id === item.tenantId)?.name ?? "";
+    return `${item.name} ${item.email} ${tenantName}`.toLocaleLowerCase("es").includes(normalizedSearch);
+  });
+  const pageCount = Math.max(1, Math.ceil(matchingUsers.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const visibleUsers = matchingUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const activeRoleTitle = ROLE_TABS.find((tab) => tab.role === activeRole)?.label ?? "Cuentas";
 
   return (
     <div className="space-y-8">
@@ -259,7 +286,10 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-ink">Cuentas</h2>
+          <div>
+            <h2 className="font-semibold text-ink">Cuentas por rol</h2>
+            <p className="text-xs text-ink-muted">Selecciona un grupo para gestionar sus cuentas.</p>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -272,6 +302,19 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
 
         {error && <Alert tone="danger">{error}</Alert>}
 
+        <div role="tablist" aria-label="Roles de usuario" className="grid gap-2 sm:grid-cols-3">
+          {ROLE_TABS.map(({ role: tabRole, label, icon: Icon }) => {
+            const count = users.filter((item) => item.role === tabRole).length;
+            const active = activeRole === tabRole;
+            return <button key={tabRole} type="button" role="tab" aria-selected={active} aria-controls="users-role-panel"
+              onClick={() => { setActiveRole(tabRole); setSearch(""); setPage(1); }}
+              className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${active ? "border-accent bg-accent/10 text-accent" : "border-border bg-surface text-ink-muted hover:border-accent/50 hover:text-ink"}`}>
+              <span className="flex min-w-0 items-center gap-2.5"><Icon className="h-4 w-4 shrink-0" /><span className="truncate text-sm font-bold">{label}</span></span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums ${active ? "bg-accent/20" : "bg-surface-raised"}`}>{count}</span>
+            </button>;
+          })}
+        </div>
+
         {loading ? (
           <Card>
             <LoadingState label="Cargando usuarios…" />
@@ -283,13 +326,25 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
             description="Crea el primer administrador con el formulario de arriba."
           />
         ) : (
-          <TableWrap>
+          <div id="users-role-panel" role="tabpanel" className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-ink-muted">{activeRoleTitle} · {roleUsers.length} {roleUsers.length === 1 ? "cuenta" : "cuentas"}</p>
+              <label className="relative block w-full sm:w-72">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+                <span className="sr-only">Buscar en {activeRoleTitle.toLowerCase()}</span>
+                <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar nombre, correo o empresa" className="pl-9" />
+              </label>
+            </div>
+            {matchingUsers.length === 0 ? <EmptyState
+              icon={<Search className="h-5 w-5" />}
+              title={search.trim() ? "No se encontraron cuentas" : `No hay ${activeRoleTitle.toLowerCase()}`}
+              description={search.trim() ? "Prueba con otro nombre, correo u organización." : "Las cuentas de este rol aparecerán aquí cuando se creen."}
+            /> : <TableWrap>
             <Table>
               <Thead>
                 <tr>
                   <Th>Nombre</Th>
                   <Th>Correo</Th>
-                  <Th>Rol</Th>
                   <Th>Organización</Th>
                   <Th>Estado</Th>
                   <Th>Último acceso</Th>
@@ -297,17 +352,12 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
                 </tr>
               </Thead>
               <tbody>
-                {users.map((item) => {
+                {visibleUsers.map((item) => {
                   const isSelf = item.id === currentUser?.id;
                   return (
                     <Tr key={item.id}>
                       <Td className="font-medium">{item.name}</Td>
                       <Td className="text-ink-muted">{item.email}</Td>
-                      <Td>
-                        <Badge variant={item.role === "SUPERADMIN" ? "accent" : "neutral"}>
-                          {ROLE_LABEL[item.role]}
-                        </Badge>
-                      </Td>
                       <Td className="text-ink-muted">{tenants.find((tenant) => tenant.id === item.tenantId)?.name ?? (item.tenantId ?? "Plataforma")}</Td>
                       <Td>
                         <Badge variant={item.isActive ? "success" : "danger"}>
@@ -353,7 +403,16 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
                 })}
               </tbody>
             </Table>
-          </TableWrap>
+          </TableWrap>}
+            {matchingUsers.length > PAGE_SIZE && <nav aria-label={`Paginación de ${activeRoleTitle.toLowerCase()}`} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+              <p className="text-xs text-ink-muted">Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, matchingUsers.length)} de {matchingUsers.length}</p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} leftIcon={<ChevronLeft className="h-4 w-4" />}>Anterior</Button>
+                <span className="min-w-12 text-center text-xs font-semibold tabular-nums text-ink-muted">{currentPage} / {pageCount}</span>
+                <Button variant="outline" size="sm" disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Siguiente <ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            </nav>}
+          </div>
         )}
       </section>
 
