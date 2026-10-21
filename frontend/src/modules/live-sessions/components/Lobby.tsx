@@ -61,7 +61,7 @@ export function Lobby({
       </div>
 
       {/* Players panel */}
-      <div className="game-panel slide-up flex flex-1 flex-col gap-4 rounded-3xl p-6 sm:p-8">
+      <div className="game-panel slide-up flex min-h-0 flex-1 flex-col gap-4 rounded-3xl p-6 sm:p-8">
         <div className="flex items-baseline justify-between gap-4">
           <div>
             <h2 className="text-xl font-black text-ink sm:text-2xl">{quizTitle}</h2>
@@ -80,12 +80,11 @@ export function Lobby({
             <p className="text-sm text-ink-soft">Escanea el código o introduce el PIN en tu móvil.</p>
           </div>
         ) : (
-          <ul className="grid flex-1 auto-rows-min grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
-            {players.map((player, index) => (
+          <ul className="grid min-h-0 w-full flex-1 content-start grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+            {players.map((player) => (
               <li
                 key={player.playerId}
-                className="game-chip stagger flex items-center gap-2 rounded-xl px-3 py-2"
-                style={{ ["--i" as string]: index % 12 }}
+                className="game-chip flex min-w-0 items-center gap-2 rounded-xl px-3 py-2"
               >
                 <Avatar avatar={player.avatar} size="sm" />
                 <span className="truncate text-sm font-semibold text-ink">{player.username}</span>

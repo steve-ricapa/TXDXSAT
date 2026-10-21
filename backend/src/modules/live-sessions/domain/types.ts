@@ -48,6 +48,9 @@ export interface QuizQuestion {
 export interface QuizSummary {
   id: string;
   tenantId?: string | null;
+  createdById: string | null;
+  creatorName: string | null;
+  origin: "STANDARD" | "MIXED";
   title: string;
   description: string | null;
   questionCount: number;
@@ -58,6 +61,9 @@ export interface QuizSummary {
 export interface QuizDetail {
   id: string;
   tenantId: string | null;
+  createdById: string | null;
+  creatorName: string | null;
+  origin: "STANDARD" | "MIXED";
   title: string;
   description: string | null;
   createdAt: string;
@@ -148,4 +154,21 @@ export interface EnginePlayer {
   socketId: string | null;
   joinedAt: number;
   lastSeenAt: number;
+}
+
+export interface QuizQuestionInput {
+  type: QuestionType;
+  text: string;
+  options: string[];
+  correctIndex?: number | null;
+  correctIndices?: number[] | null;
+  correctText?: string | null;
+  rangeMin?: number | null;
+  rangeMax?: number | null;
+  correctNumber?: number | null;
+  explanation?: string | null;
+  imageUrl?: string | null;
+  optionImages?: (string | null)[] | null;
+  baseScore: number;
+  timeSec: number;
 }

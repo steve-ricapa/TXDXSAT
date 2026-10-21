@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { ForbiddenError, NotFoundError } from "../../../shared/errors/app-error.ts";
+import { ForbiddenError, NotFoundError, ValidationError } from "../../../shared/errors/app-error.ts";
 import { parseOrThrow } from "../../../shared/middleware/validate.ts";
 import { isUuid, newNumericCode } from "../../../shared/utils/id.ts";
 import { QUESTION_TYPES } from "../domain/types.ts";
 import type { QuizDetail, QuizSummary } from "../domain/types.ts";
-import type { LiveSessionStore, NewQuestionInput } from "./ports.ts";
+import { QUESTION_BANK_MODULES, type ComposeQuizInput, type CreateQuestionBankInput, type QuestionBankModule } from "../domain/bank.types.ts";
+import type { LiveSessionStore, NewQuestionInput, QuestionBankRepo, QuestionComposer } from "./ports.ts";
 
 /**
  * Accepts either an external http(s) URL or a deployment-relative media path
@@ -53,6 +54,7 @@ export const createQuizSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).nullish(),
   tenantId: z.string().uuid().nullish(),
+  origin: z.enum(["STANDARD", "MIXED"]).default("STANDARD"),
   questions: z.array(questionSchema).min(1).max(100),
 });
 
@@ -87,12 +89,14 @@ function toNewQuestions(questions: ParsedQuestion[]): NewQuestionInput[] {
 export class CreateQuizUseCase {
   constructor(private readonly store: LiveSessionStore) {}
 
-  async execute(input: CreateQuizInput): Promise<{ id: string; questionCount: number }> {
+  async execute(input: CreateQuizInput, createdById: string | null = null): Promise<{ id: string; questionCount: number }> {
     const data = parseOrThrow(createQuizSchema, input);
     return this.store.createQuiz({
       title: data.title,
       description: data.description ?? null,
       tenantId: data.tenantId ?? null,
+      createdById,
+      origin: data.origin,
       questions: toNewQuestions(data.questions),
     });
   }
@@ -133,6 +137,121 @@ export class ListQuizzesUseCase {
 
   async execute(filter?: { tenantId?: string | null }): Promise<QuizSummary[]> {
     return this.store.listQuizzes(filter);
+  }
+}
+
+const mixCompanyQuizzesSchema = z.object({
+  quizIds: z.array(z.string().uuid()).min(2).max(10),
+  questionCount: z.number().int().min(2).max(100),
+  timeSec: z.number().int().min(5).max(120).nullable().optional(),
+});
+
+/** Build an editable copy; source quizzes and their question timers are untouched. */
+export class MixCompanyQuizzesUseCase {
+  constructor(private readonly store: LiveSessionStore) {}
+
+  async execute(input: unknown, tenantId: string | null) {
+    if (!tenantId) throw new ForbiddenError("Tu cuenta no tiene organización asignada");
+    const data = parseOrThrow(mixCompanyQuizzesSchema, input);
+    if (new Set(data.quizIds).size !== data.quizIds.length) {
+      throw new ValidationError("Selecciona cuestionarios diferentes");
+    }
+    if (data.questionCount < data.quizIds.length) {
+      throw new ValidationError("El total debe permitir al menos una pregunta de cada cuestionario");
+    }
+
+    const sources = await Promise.all(data.quizIds.map((id) => this.store.getQuizDetail(id)));
+    if (sources.some((quiz) => !quiz || quiz.tenantId !== tenantId)) {
+      throw new ForbiddenError("Solo puedes mezclar cuestionarios de tu organización");
+    }
+    const validSources = sources.filter((quiz): quiz is NonNullable<typeof quiz> => quiz !== null);
+    if (validSources.some((quiz) => quiz.questions.length === 0)) {
+      throw new ValidationError("Todos los cuestionarios deben tener preguntas");
+    }
+
+    const shuffled = <T>(items: T[]): T[] => {
+      const result = [...items];
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j] as T, result[i] as T];
+      }
+      return result;
+    };
+    const pools = validSources.map((quiz) => shuffled(quiz.questions));
+    const available = pools.reduce((sum, pool) => sum + pool.length, 0);
+    if (data.questionCount > available) {
+      throw new ValidationError(`Solo hay ${available} preguntas disponibles entre los cuestionarios seleccionados`);
+    }
+    // Take one from each source before filling the remainder at random.
+    const chosen = pools.map((pool) => pool.shift()!);
+    const remaining = shuffled(pools.flat()).slice(0, data.questionCount - chosen.length);
+    const questions = shuffled([...chosen, ...remaining]).map((question) => ({
+      type: question.type,
+      text: question.text,
+      options: [...question.options],
+      correctIndex: question.correctIndex,
+      correctIndices: question.correctIndices ? [...question.correctIndices] : null,
+      correctText: question.correctText,
+      rangeMin: question.rangeMin,
+      rangeMax: question.rangeMax,
+      correctNumber: question.correctNumber,
+      explanation: question.explanation,
+      imageUrl: question.imageUrl,
+      optionImages: question.optionImages ? [...question.optionImages] : null,
+      baseScore: question.baseScore,
+      timeSec: data.timeSec ?? question.timeSec,
+    }));
+    return { questions, sourceTitles: validSources.map((quiz) => quiz.title) };
+  }
+}
+
+const bankQuestionSchema = questionSchema;
+const createBankSchema = z.object({
+  tenantId: z.string().uuid().nullable().optional(),
+  name: z.string().trim().min(1).max(160),
+  module: z.enum(QUESTION_BANK_MODULES),
+  description: z.string().max(2000).nullable().optional(),
+  isShared: z.boolean().optional(),
+  items: z.array(bankQuestionSchema).min(1).max(500),
+});
+
+const composeSchema = z.object({
+  totalMax: z.number().int().min(1).max(100).default(20),
+  mix: z.array(z.object({ bankId: z.string().uuid(), count: z.number().int().min(0).max(100) })).min(1).max(20),
+});
+
+export class ListQuestionBanksUseCase {
+  constructor(private readonly banks: QuestionBankRepo) {}
+  execute(filter: { tenantId?: string | null; module?: QuestionBankModule }) {
+    return this.banks.listBanks(filter);
+  }
+}
+
+export class GetQuestionBankUseCase {
+  constructor(private readonly banks: QuestionBankRepo) {}
+  async execute(id: string) {
+    if (!isUuid(id)) throw new NotFoundError("Question bank not found");
+    const bank = await this.banks.getBank(id);
+    if (!bank) throw new NotFoundError("Question bank not found");
+    return bank;
+  }
+}
+
+export class CreateQuestionBankUseCase {
+  constructor(private readonly banks: QuestionBankRepo) {}
+  async execute(input: unknown): Promise<ReturnType<QuestionBankRepo["createBank"]> extends Promise<infer T> ? T : never> {
+    const data = parseOrThrow(createBankSchema, input);
+    return this.banks.createBank(data as CreateQuestionBankInput);
+  }
+}
+
+export class ComposeQuizFromBanksUseCase {
+  constructor(private readonly composer: QuestionComposer) {}
+  async execute(input: unknown, tenantId: string | null, isSuperAdmin: boolean) {
+    const data = parseOrThrow(composeSchema, input) as ComposeQuizInput;
+    const questions = await this.composer.compose(data, tenantId, isSuperAdmin);
+    if (!questions.length) throw new NotFoundError("No questions available in selected banks");
+    return { questions };
   }
 }
 

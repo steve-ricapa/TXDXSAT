@@ -8,13 +8,19 @@ import { GameEngine, type GameEngineOptions } from "./application/game-engine.ts
 import {
   CreateLiveSessionUseCase,
   CreateQuizUseCase,
+  CreateQuestionBankUseCase,
+  ComposeQuizFromBanksUseCase,
+  GetQuestionBankUseCase,
   GetQuizDetailUseCase,
   GetSessionResultsUseCase,
   ListQuizzesUseCase,
+  MixCompanyQuizzesUseCase,
+  ListQuestionBanksUseCase,
   UpdateQuizUseCase,
 } from "./application/live-session.usecases.ts";
 import type { GameBroadcaster } from "./application/ports.ts";
 import { LiveSessionRepository } from "./infrastructure/live-session.repository.ts";
+import { BankQuestionComposer } from "./application/composer.ts";
 import { SocketGameBroadcaster } from "./infrastructure/socket-broadcaster.ts";
 import { registerLiveSessionSocketHandlers } from "./presentation/live-session.socket.ts";
 import { createLiveSessionRouter } from "./presentation/live-session.routes.ts";
@@ -85,10 +91,15 @@ export function createLiveSessionModule(
     store: repository,
     createQuiz: new CreateQuizUseCase(repository),
     listQuizzes: new ListQuizzesUseCase(repository),
+    mixCompanyQuizzes: new MixCompanyQuizzesUseCase(repository),
     getQuizDetail: new GetQuizDetailUseCase(repository),
     updateQuiz: new UpdateQuizUseCase(repository),
     createSession: new CreateLiveSessionUseCase(repository),
     getResults: new GetSessionResultsUseCase(repository),
+    listBanks: new ListQuestionBanksUseCase(repository),
+    getBank: new GetQuestionBankUseCase(repository),
+    createBank: new CreateQuestionBankUseCase(repository),
+    composeQuiz: new ComposeQuizFromBanksUseCase(new BankQuestionComposer(repository)),
   };
 
   const router = createLiveSessionRouter(useCases);

@@ -1,4 +1,4 @@
-import type { DatabaseClient } from "../../../shared/database/prisma.ts";
+﻿import type { DatabaseClient } from "../../../shared/database/prisma.ts";
 import type {
   AnswerRecord,
   LeaderboardEntry,
@@ -8,6 +8,13 @@ import type {
   QuizQuestion,
   QuizSummary,
 } from "../domain/types.ts";
+import type {
+  BankDetail,
+  BankSummary,
+  ComposeQuizInput,
+  CreateQuestionBankInput,
+  QuestionBankModule,
+} from "../domain/bank.types.ts";
 
 export interface SessionRecord {
   id: string;
@@ -49,6 +56,8 @@ export interface LiveSessionStore {
     title: string;
     description: string | null;
     tenantId: string | null;
+    createdById: string | null;
+    origin: "STANDARD" | "MIXED";
     questions: NewQuestionInput[];
   }): Promise<{ id: string; questionCount: number }>;
   listQuizzes(filter?: { tenantId?: string | null }): Promise<QuizSummary[]>;
@@ -117,6 +126,11 @@ export interface LiveSessionStore {
   ): Promise<void>;
   setCurrentQuestionIndex(sessionId: string, index: number): Promise<void>;
   saveAnswer(sessionId: string, tenantId: string | null, record: AnswerRecord): Promise<void>;
+  getAnswerCounts(sessionId: string): Promise<Array<{
+    playerId: string;
+    correctAnswers: number;
+    totalAnswers: number;
+  }>>;
   finalizeSession(
     input: {
       sessionId: string;
@@ -148,4 +162,13 @@ export interface DomainEventSink {
     event: import("../../../events/contracts/domain-event.ts").DomainEvent,
     options?: { transaction?: DatabaseClient },
   ): Promise<void>;
+}
+export interface QuestionBankRepo {
+  listBanks(filter: { tenantId?: string | null; module?: QuestionBankModule }): Promise<BankSummary[]>;
+  getBank(id: string): Promise<BankDetail | null>;
+  createBank(input: CreateQuestionBankInput): Promise<BankDetail>;
+}
+
+export interface QuestionComposer {
+  compose(input: ComposeQuizInput, tenantId: string | null, isSuperAdmin: boolean): Promise<import("../domain/types.ts").QuizQuestionInput[]>;
 }

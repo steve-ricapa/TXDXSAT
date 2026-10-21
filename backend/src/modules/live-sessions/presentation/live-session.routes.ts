@@ -5,9 +5,14 @@ import type { LiveSessionStore } from "../application/ports.ts";
 import type {
   CreateLiveSessionUseCase,
   CreateQuizUseCase,
+  CreateQuestionBankUseCase,
+  ComposeQuizFromBanksUseCase,
+  GetQuestionBankUseCase,
   GetQuizDetailUseCase,
   GetSessionResultsUseCase,
   ListQuizzesUseCase,
+  MixCompanyQuizzesUseCase,
+  ListQuestionBanksUseCase,
   UpdateQuizUseCase,
 } from "../application/live-session.usecases.ts";
 
@@ -15,10 +20,15 @@ export interface LiveSessionRouterDeps {
   store: LiveSessionStore;
   createQuiz: CreateQuizUseCase;
   listQuizzes: ListQuizzesUseCase;
+  mixCompanyQuizzes: MixCompanyQuizzesUseCase;
   getQuizDetail: GetQuizDetailUseCase;
   updateQuiz: UpdateQuizUseCase;
   createSession: CreateLiveSessionUseCase;
   getResults: GetSessionResultsUseCase;
+  listBanks: ListQuestionBanksUseCase;
+  getBank: GetQuestionBankUseCase;
+  createBank: CreateQuestionBankUseCase;
+  composeQuiz: ComposeQuizFromBanksUseCase;
 }
 
 /**
@@ -35,6 +45,60 @@ export function createLiveSessionRouter(deps: LiveSessionRouterDeps): Router {
     const user = (req as AuthenticatedRequest).user;
     if (!user) throw new UnauthorizedError();
     res.json({ results: await deps.store.getResultsForUser(user.id, user.tenantId) });
+  });
+
+  router.get("/banks", async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    if (user?.role !== "SUPERADMIN" && user?.role !== "ADMIN") {
+      throw new ForbiddenError("Solo administradores pueden consultar bancos");
+    }
+    if (user.role === "ADMIN" && !user.tenantId) throw new ForbiddenError("Tu cuenta no tiene organización asignada");
+    const rawModule = req.query.module;
+    const module = typeof rawModule === "string" ? rawModule : undefined;
+    const banks = await deps.listBanks.execute({
+      ...(user.role === "SUPERADMIN" && typeof req.query.tenantId === "string"
+        ? { tenantId: req.query.tenantId === "shared" ? null : req.query.tenantId }
+        : user.role === "ADMIN" ? { tenantId: user.tenantId } : {}),
+      ...(module ? { module: module as import("../domain/bank.types.ts").QuestionBankModule } : {}),
+    });
+    res.json({ banks });
+  });
+
+  router.get("/banks/:id", async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    if (user?.role !== "SUPERADMIN" && user?.role !== "ADMIN") throw new ForbiddenError();
+    if (user.role === "ADMIN" && !user.tenantId) throw new ForbiddenError("Tu cuenta no tiene organización asignada");
+    const bank = await deps.getBank.execute(String(req.params.id));
+    if (user.role !== "SUPERADMIN" && bank.tenantId !== user.tenantId && !bank.isShared) {
+      throw new ForbiddenError("No tienes acceso a este banco");
+    }
+    res.json(bank);
+  });
+
+  router.post("/banks", async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    if (user?.role !== "SUPERADMIN" && user?.role !== "ADMIN") throw new ForbiddenError();
+    if (user.role === "ADMIN" && !user.tenantId) throw new ForbiddenError("Tu cuenta no tiene organización asignada");
+    const body = req.body ?? {};
+    const bank = await deps.createBank.execute({
+      ...body,
+      tenantId: user.role === "SUPERADMIN" ? (body.tenantId ?? null) : user.tenantId,
+      isShared: user.role === "SUPERADMIN" ? (body.isShared ?? false) : false,
+      createdById: user.id,
+    });
+    res.status(201).json(bank);
+  });
+
+  router.post("/quizzes/compose", async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    if (user?.role !== "SUPERADMIN" && user?.role !== "ADMIN") throw new ForbiddenError();
+    res.json(await deps.composeQuiz.execute(req.body ?? {}, user.tenantId, user.role === "SUPERADMIN"));
+  });
+
+  router.post("/quizzes/mix-company", async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    if (user?.role !== "ADMIN") throw new ForbiddenError("Solo administradores de empresa pueden usar la mezcla rápida");
+    res.json(await deps.mixCompanyQuizzes.execute(req.body ?? {}, user.tenantId));
   });
 
   router.get("/me/results/:sessionId", async (req, res) => {
@@ -58,12 +122,15 @@ export function createLiveSessionRouter(deps: LiveSessionRouterDeps): Router {
     const quiz = await deps.createQuiz.execute({
       ...body,
       tenantId: user.role === "SUPERADMIN" ? (body.tenantId ?? null) : user.tenantId,
-    });
+    }, user.id);
     res.status(201).json(quiz);
   });
 
   router.get("/quizzes", async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
+    if (user?.role === "ADMIN" && req.query.scope === "company" && !user.tenantId) {
+      throw new ForbiddenError("Tu cuenta no tiene organización asignada");
+    }
     let filter: { tenantId?: string | null } | undefined;
     if (user?.role === "SUPERADMIN") {
       const qTenant = req.query.tenantId;
@@ -74,7 +141,9 @@ export function createLiveSessionRouter(deps: LiveSessionRouterDeps): Router {
       filter = { tenantId: user.tenantId };
     }
     const quizzes = await deps.listQuizzes.execute(filter);
-    res.json({ quizzes });
+    res.json({ quizzes: user?.role === "ADMIN" && req.query.scope === "company"
+      ? quizzes.filter((quiz) => quiz.tenantId === user.tenantId)
+      : quizzes });
   });
 
   router.get("/quizzes/:id", async (req, res) => {

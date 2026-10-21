@@ -113,6 +113,8 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   sessions     Session[]
   livePlayers  LivePlayer[]
+  questionBanks QuestionBank[]
+  createdQuizzes Quiz[]
   @@index([tenantId])
   @@map("users")
 }
@@ -155,16 +157,20 @@ enum LiveSessionStatus {
 model Quiz {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String?  @map("tenant_id") @db.Uuid
+  createdById String?  @map("created_by_id") @db.Uuid
   title       String   @db.VarChar(200)
   description String?
+  origin      String   @default("STANDARD") @db.VarChar(20)
   language    String   @default("es") @db.VarChar(10)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   questions Question[]
   sessions  LiveSession[]
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
+  @@index([createdById])
   @@map("quizzes")
 }
 
@@ -314,5 +320,59 @@ model Tenant {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("tenants")
+}
+
+enum QuestionBankModule {
+  PHISHING
+  INTERNET_SECURITY
+  MALICIOUS_EMAILS
+}
+
+model QuestionBank {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String?            @map("tenant_id") @db.Uuid
+  name        String             @db.VarChar(160)
+  module      QuestionBankModule
+  description String?
+  isShared    Boolean            @default(false) @map("is_shared")
+  createdById String?            @map("created_by_id") @db.Uuid
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdBy User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items     QuestionBankItem[]
+
+  @@index([tenantId])
+  @@index([module])
+  @@index([isShared])
+  @@map("question_banks")
+}
+
+model QuestionBankItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  bankId         String       @map("bank_id") @db.Uuid
+  orderIndex     Int          @map("order_index")
+  type           QuestionType @default(MULTIPLE_CHOICE)
+  text           String
+  options        Json         @default("[]")
+  correctIndex   Int?         @map("correct_index")
+  correctIndices Json?        @map("correct_indices")
+  correctText    String?      @map("correct_text")
+  rangeMin       Int?         @map("range_min")
+  rangeMax       Int?         @map("range_max")
+  correctNumber  Int?         @map("correct_number")
+  explanation    String?
+  imageUrl       String?      @map("image_url")
+  optionImages   Json?        @map("option_images")
+  baseScore      Int          @default(500) @map("base_score")
+  timeSec        Int          @default(20) @map("time_sec")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  bank QuestionBank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+
+  @@unique([bankId, orderIndex])
+  @@index([bankId])
+  @@map("question_bank_items")
 }
 

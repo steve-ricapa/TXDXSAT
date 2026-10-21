@@ -3,6 +3,10 @@ import type { QuestionType } from "./protocol";
 
 export interface QuizSummary {
   id: string;
+  tenantId: string | null;
+  createdById: string | null;
+  creatorName: string | null;
+  origin: "STANDARD" | "MIXED";
   title: string;
   description: string | null;
   questionCount: number;
@@ -89,6 +93,7 @@ export interface QuizPayload {
   title: string;
   description?: string | null;
   tenantId?: string | null;
+  origin?: "STANDARD" | "MIXED";
   questions: QuizQuestionInput[];
 }
 
@@ -100,10 +105,30 @@ export interface QuizDetailQuestion extends QuizQuestionInput {
 export interface QuizDetail {
   id: string;
   tenantId: string | null;
+  createdById: string | null;
+  creatorName: string | null;
+  origin: "STANDARD" | "MIXED";
   title: string;
   description: string | null;
   createdAt: string;
   questions: QuizDetailQuestion[];
+}
+
+export type QuestionBankModule = "PHISHING" | "INTERNET_SECURITY" | "MALICIOUS_EMAILS";
+
+export interface BankSummary {
+  id: string;
+  tenantId: string | null;
+  name: string;
+  module: QuestionBankModule;
+  description: string | null;
+  isShared: boolean;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface BankDetail extends BankSummary {
+  items: QuizQuestionInput[];
 }
 
 export const liveApi = {
@@ -111,6 +136,9 @@ export const liveApi = {
     api.get<{ quizzes: QuizSummary[] }>(
       tenantId ? `/live/quizzes?tenantId=${tenantId}` : "/live/quizzes",
     ),
+  listCompanyQuizzes: () => api.get<{ quizzes: QuizSummary[] }>(`/live/quizzes?scope=company&refresh=${Date.now()}`),
+  mixCompanyQuizzes: (payload: { quizIds: string[]; questionCount: number; timeSec?: number | null }) =>
+    api.post<{ questions: QuizQuestionInput[]; sourceTitles: string[] }>("/live/quizzes/mix-company", payload),
   getQuizDetail: (id: string) => api.get<QuizDetail>(`/live/quizzes/${id}`),
   createQuiz: (payload: QuizPayload) =>
     api.post<{ id: string; questionCount: number }>("/live/quizzes", payload),
@@ -119,6 +147,17 @@ export const liveApi = {
       method: "PUT",
       body: payload,
     }),
+  listBanks: (module?: QuestionBankModule) =>
+    api.get<{ banks: BankSummary[] }>(`/live/banks${module ? `?module=${module}` : ""}`),
+  getBank: (id: string) => api.get<BankDetail>(`/live/banks/${id}`),
+  createBank: (payload: {
+    name: string;
+    module: QuestionBankModule;
+    description?: string | null;
+    items: QuizQuestionInput[];
+  }) => api.post<BankDetail>("/live/banks", payload),
+  composeQuiz: (payload: { totalMax: number; mix: Array<{ bankId: string; count: number }> }) =>
+    api.post<{ questions: QuizQuestionInput[] }>("/live/quizzes/compose", payload),
   createSession: (quizId: string, tenantId?: string | null) =>
     api.post<CreateSessionResult>("/live/sessions", { quizId, tenantId }),
   getResults: (sessionId: string, token: string) =>

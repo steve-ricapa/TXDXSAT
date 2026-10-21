@@ -4,10 +4,32 @@ import { Lock, Mail, ShieldCheck } from "lucide-react";
 import { ApiError } from "@/services/api-client";
 import { BrandMark } from "@/components/BrandLogo";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import type { AuthUser } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
 interface LocationState {
   from?: string;
+}
+
+function defaultPathFor(user: AuthUser): string {
+  if (user.role === "SUPERADMIN") return "/superadmin";
+  if (user.role === "EMPLOYEE") return "/employee";
+  return "/admin";
+}
+
+function loginDestination(user: AuthUser, requestedPath: unknown): string {
+  const fallback = defaultPathFor(user);
+  if (typeof requestedPath !== "string" || !requestedPath.startsWith("/") || requestedPath.startsWith("//")) return fallback;
+  const path = requestedPath.split(/[?#]/, 1)[0];
+  if (["/", "/login", "/dashboard"].includes(path)) return fallback;
+
+  const allowedPaths: Record<AuthUser["role"], string[]> = {
+    SUPERADMIN: ["/admin", "/superadmin", "/account", "/live/editor", "/live/host"],
+    ADMIN: ["/admin", "/account", "/live/editor", "/live/host"],
+    EMPLOYEE: ["/employee", "/account", "/employee/history", "/live/join", "/live/play"],
+  };
+  const canOpen = allowedPaths[user.role].some((base) => path === base || path.startsWith(`${base}/`));
+  return canOpen ? requestedPath : fallback;
 }
 
 /**
@@ -24,11 +46,11 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const from = (location.state as LocationState | null)?.from ?? "/dashboard";
+  const requestedPath = (location.state as LocationState | null)?.from;
 
   // Already authenticated: skip the form.
   if (status === "authenticated" && user) {
-    return <Navigate to={from} replace />;
+    return <Navigate to={loginDestination(user, requestedPath)} replace />;
   }
 
   async function onSubmit(event: FormEvent) {
@@ -36,8 +58,8 @@ export function LoginPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await login(email.trim(), password);
-      navigate(from, { replace: true });
+      const authenticatedUser = await login(email.trim(), password);
+      navigate(loginDestination(authenticatedUser, requestedPath), { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo iniciar sesión");
     } finally {

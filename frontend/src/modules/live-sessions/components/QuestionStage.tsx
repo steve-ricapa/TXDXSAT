@@ -40,36 +40,41 @@ export function QuestionStage({
   const image = resolveMediaUrl(question.imageUrl);
   const isTextType = question.type === "open_text" || question.type === "closest_to";
   const slots = question.options.map((_, index) => index);
+  const longQuestion = question.text.length > 70;
+  const veryLongQuestion = question.text.length > 140;
+  const compactAnswers = longQuestion || question.options.some((option) => option.length > 48);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-4 sm:gap-6">
+    <div className="flex min-h-full flex-col gap-3 sm:gap-4">
       {/* Header — number + question */}
-      <header className="text-center">
+      <header className="shrink-0 text-center">
         <span className="game-chip inline-block rounded-full px-4 py-1 text-sm font-bold uppercase tracking-[0.25em] text-ink-muted">
           Pregunta {question.index + 1} / {question.total}
         </span>
-        <h1 className="mx-auto mt-3 max-w-6xl text-pretty text-2xl font-black leading-tight text-ink drop-shadow sm:text-3xl xl:text-5xl">
+        <h1 className={`mx-auto mt-3 max-w-6xl text-pretty font-black leading-tight text-ink drop-shadow [overflow-wrap:anywhere] ${
+          veryLongQuestion
+            ? "text-xl sm:text-2xl xl:text-3xl"
+            : longQuestion
+              ? "text-2xl sm:text-3xl xl:text-4xl"
+              : "text-2xl sm:text-3xl xl:text-5xl"
+        }`}>
           {question.text}
         </h1>
       </header>
 
       {/* Centre — image + timer + answers received */}
-      <section className="flex min-h-0 items-center justify-center gap-6 xl:gap-12">
+      <section className="flex min-h-[120px] flex-1 flex-wrap items-center justify-center gap-3 sm:gap-6 xl:gap-8">
         {image && (
           <img
             src={image}
             alt=""
-            className="slide-up max-h-full min-h-0 flex-1 rounded-2xl object-contain shadow-2xl"
-            style={{ maxHeight: "100%" }}
+            className="slide-up max-h-52 min-w-0 flex-1 rounded-2xl object-contain shadow-2xl xl:max-h-72"
           />
         )}
 
-        <div className="flex shrink-0 flex-col items-center gap-4">
-          {!revealed && !isTextType && (
-            <TimerRing remaining={remaining} total={question.timeSec} size={image ? 120 : 150} />
-          )}
-          {!revealed && isTextType && (
-            <TimerRing remaining={remaining} total={question.timeSec} size={image ? 120 : 150} />
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 sm:gap-5">
+          {!revealed && (
+            <TimerRing remaining={remaining} total={question.timeSec} size={image || longQuestion ? 112 : 132} />
           )}
 
           {revealed ? (
@@ -80,8 +85,8 @@ export function QuestionStage({
               </p>
             </div>
           ) : (
-            <div className="game-chip rounded-2xl px-6 py-3 text-center">
-              <p className="text-3xl font-black tabular-nums text-ink sm:text-4xl">
+            <div className="game-chip rounded-2xl px-4 py-2 text-center sm:px-6 sm:py-3">
+              <p className="text-2xl font-black tabular-nums text-ink sm:text-3xl">
                 {answeredCount}
                 <span className="text-lg font-bold text-ink-muted sm:text-2xl"> / {playerCount}</span>
               </p>
@@ -94,7 +99,7 @@ export function QuestionStage({
       </section>
 
       {/* Footer — answers */}
-      <footer className="min-h-0">
+      <footer className="shrink-0">
         {isTextType ? (
           <div className="mx-auto flex max-w-3xl flex-col items-center gap-3">
             {!revealed ? (
@@ -139,6 +144,7 @@ export function QuestionStage({
                     maxVotes={maxVotes}
                     showVotes={revealed}
                     index={slot}
+                    compact={compactAnswers}
                   />
                 );
               })}

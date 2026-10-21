@@ -66,8 +66,8 @@ export interface EmployeeProgress {
   incorrectAnswers: number;
   totalAnswers: number;
   accuracyRate: number;
-  riskLevel: "Bajo" | "Medio" | "Alto";
-  status: "Sobresaliente" | "Aprobado" | "Requiere Refuerzo";
+  riskLevel: "Bajo" | "Medio" | "Alto" | "Sin datos";
+  status: "Sobresaliente" | "Aprobado" | "Requiere Refuerzo" | "Sin evaluar";
 }
 
 export interface TenantAnalytics {

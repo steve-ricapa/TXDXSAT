@@ -23,8 +23,9 @@ function optionImage(question: PublicQuestion, slot: number): string | null {
 
 /**
  * Participant answer pad. Large, thumb-friendly, no scrolling. Every answer
- * needs explicit confirmation so a tap is visibly selectable before submission. After
- * answering the pad visually locks. The server remains authoritative.
+ * Single-choice answers submit on selection. Multi-select and text answers keep
+ * an explicit send action because the player must finish composing the answer.
+ * After submission the pad visually locks; the server remains authoritative.
  */
 export function QuestionPanel({
   question,
@@ -67,7 +68,7 @@ export function QuestionPanel({
           ✅
         </div>
         <div>
-          <p className="text-2xl font-black text-ink">¡Respuesta confirmada!</p>
+          <p className="text-2xl font-black text-ink">¡Respuesta enviada!</p>
           <p className="mt-1 text-sm text-ink-muted">Espera a que el anfitrión muestre los resultados.</p>
         </div>
         {selectedSlots.length > 0 || submitted?.text ? selectedAnswer : null}
@@ -154,15 +155,19 @@ export function QuestionPanel({
               state={isSelected ? "selected" : selected.length > 0 ? "dimmed" : "idle"}
               index={slot}
               className="flex-1"
-              onClick={() =>
-                isMulti
-                  ? setSelected((current) =>
-                      current.includes(slot)
-                        ? current.filter((value) => value !== slot)
-                        : [...current, slot].sort((a, b) => a - b),
-                    )
-                  : setSelected([slot])
-              }
+              onClick={() => {
+                if (isMulti) {
+                  setSelected((current) =>
+                    current.includes(slot)
+                      ? current.filter((value) => value !== slot)
+                      : [...current, slot].sort((a, b) => a - b),
+                  );
+                  return;
+                }
+
+                setSelected([slot]);
+                onSubmit({ chosenIndex: slot });
+              }}
             />
           );
         })}
@@ -175,24 +180,15 @@ export function QuestionPanel({
           onClick={() => onSubmit({ chosenIndices: selected })}
           className="flex items-center justify-center gap-2 rounded-2xl bg-accent px-6 py-4 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
         >
-          Enviar {selected.length > 0 && `(${selected.length})`}
-        </button>
-      )}
-
-      {!isMulti && (
-        <button
-          type="button"
-          disabled={selected.length === 0}
-          onClick={() => onSubmit({ chosenIndex: selected[0] })}
-          className="flex items-center justify-center rounded-2xl bg-accent px-6 py-4 text-lg font-black uppercase tracking-wide text-[#04211f] shadow-[0_6px_0_0_#00a79f] transition enabled:hover:brightness-110 enabled:active:translate-y-1 enabled:active:shadow-none disabled:opacity-40"
-        >
-          Confirmar respuesta
+          Enviar selección {selected.length > 0 && `(${selected.length})`}
         </button>
       )}
 
       {selected.length > 0 && (
         <p className="text-center text-xs text-ink-muted">
-          Puedes tocar otra opción y cambiar tu selección antes de confirmar.
+          {isMulti
+            ? "Puedes marcar varias opciones y cambiar tu selección antes de enviarla."
+            : "Tu respuesta se envió al seleccionarla."}
         </p>
       )}
 

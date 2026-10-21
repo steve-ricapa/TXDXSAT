@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { routeUrl } from "@/lib/env";
 import { getSocket } from "@/services/socket";
 import { Leaderboard } from "../components/Leaderboard";
@@ -23,19 +24,26 @@ import type {
 } from "../lib/protocol";
 import { hostStore, type StoredHost } from "../lib/storage";
 import { liveErrorMessage } from "../lib/error-message";
+import { mergePlayerSnapshots, upsertPlayerSnapshot } from "../lib/merge-player-snapshots";
+import { useAuth } from "@/modules/auth/context/AuthContext";
 
 /** Host control screen (`/live/host/:sessionId`), protected by the host token. */
 export function HostPage() {
   const { sessionId = "" } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [record, setRecord] = useState<StoredHost | null>(() => hostStore.load(sessionId));
   const tokenFromQuery = params.get("token");
-  const hostToken = tokenFromQuery ?? record?.hostToken ?? null;
+  const hostToken = tokenFromQuery ?? (record?.sessionId === sessionId ? record.hostToken : null);
 
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [quizTab, setQuizTab] = useState<"STANDARD" | "MIXED">("STANDARD");
+  const [quizQuery, setQuizQuery] = useState("");
+  const [quizPage, setQuizPage] = useState(1);
   const [setupError, setSetupError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -54,14 +62,24 @@ export function HostPage() {
   // Load the quiz catalog in setup mode.
   useEffect(() => {
     if (hostToken) return;
+    setCatalogLoading(true);
     liveApi
       .listQuizzes()
       .then((data) => {
         setQuizzes(data.quizzes);
-        if (data.quizzes[0]) setSelectedQuiz(data.quizzes[0].id);
       })
-      .catch((err) => setSetupError(err instanceof Error ? err.message : "No se pudo cargar los cuestionarios"));
+      .catch((err) => setSetupError(err instanceof Error ? err.message : "No se pudieron cargar los cuestionarios"))
+      .finally(() => setCatalogLoading(false));
   }, [hostToken]);
+
+  const standardQuizzes = quizzes.filter((quiz) => quiz.origin !== "MIXED");
+  const mixedQuizzes = quizzes.filter((quiz) => quiz.origin === "MIXED");
+  const catalogGroup = quizTab === "STANDARD" ? standardQuizzes : mixedQuizzes;
+  const filteredQuizzes = catalogGroup.filter((quiz) => `${quiz.title} ${quiz.creatorName ?? ""} ${quiz.description ?? ""}`.toLocaleLowerCase("es").includes(quizQuery.trim().toLocaleLowerCase("es")));
+  const pageCount = Math.max(1, Math.ceil(filteredQuizzes.length / 6));
+  const currentPage = Math.min(quizPage, pageCount);
+  const visibleQuizzes = filteredQuizzes.slice((currentPage - 1) * 6, currentPage * 6);
+  const selectedQuizData = quizzes.find((quiz) => quiz.id === selectedQuiz);
 
   // Connect as host.
   useEffect(() => {
@@ -86,7 +104,9 @@ export function HostPage() {
 
   useSocketEvent<SessionStatePayload>(ServerEvents.sessionState, (payload) => {
     if (payload.sessionId !== sessionId) return;
-    setState(payload);
+    setState((current) => current
+      ? { ...payload, players: mergePlayerSnapshots(current.players, payload.players) }
+      : payload);
     if (payload.viewToken) {
       const next: StoredHost = {
         sessionId,
@@ -123,8 +143,7 @@ export function HostPage() {
   useSocketEvent<PlayerJoinedPayload>(ServerEvents.playerJoined, (player) => {
     setState((current) => {
       if (!current) return current;
-      const players = current.players.filter((item) => item.playerId !== player.playerId);
-      players.push(player);
+      const players = upsertPlayerSnapshot(current.players, player);
       return { ...current, players };
     });
   });
@@ -178,13 +197,15 @@ export function HostPage() {
     setSetupError(null);
     try {
       const created = await liveApi.createSession(selectedQuiz);
-      hostStore.save({
+      const next: StoredHost = {
         sessionId: created.sessionId,
         pin: created.pin,
         hostToken: created.hostToken,
         viewToken: created.viewToken,
         quizTitle: created.quizTitle,
-      });
+      };
+      hostStore.save(next);
+      setRecord(next);
       navigate(`/live/host/${created.sessionId}`, { replace: true });
     } catch (err) {
       setSetupError(err instanceof Error ? err.message : "No se pudo crear la sesión");
@@ -198,15 +219,22 @@ export function HostPage() {
     return (
       <div className="live-screen flex min-h-screen items-center justify-center px-4 py-10">
         <LiveBackground />
-        <div className="game-panel slide-up relative z-10 w-full max-w-lg space-y-5 rounded-3xl p-6 sm:p-8">
-          <header>
-            <h1 className="text-3xl font-black text-ink">Nueva sesión en vivo</h1>
-            <p className="mt-1 text-sm text-ink-muted">
-              Elige un cuestionario para generar el PIN y el QR de acceso.
-            </p>
+        <div className="game-panel slide-up relative z-10 w-full max-w-3xl space-y-5 rounded-3xl p-6 sm:p-8">
+          <header className="flex items-start gap-3">
+            <button type="button" onClick={() => navigate(user?.role === "SUPERADMIN" ? "/superadmin" : "/admin")}
+              aria-label="Volver al panel" title="Volver al panel"
+              className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border text-ink-muted transition hover:border-accent hover:bg-accent/10 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-ink">Nueva sesión en vivo</h1>
+              <p className="mt-1 text-sm text-ink-muted">
+                Elige un cuestionario para generar el PIN y el QR de acceso.
+              </p>
+            </div>
           </header>
 
-          {quizzes.length === 0 ? (
+          {catalogLoading ? <p className="game-inset rounded-2xl p-4 text-sm text-ink-muted">Cargando cuestionarios…</p> : quizzes.length === 0 ? (
             <div className="game-inset space-y-3 rounded-2xl p-4">
               <p className="text-sm text-ink-muted">Todavía no hay cuestionarios.</p>
               <Link
@@ -216,22 +244,41 @@ export function HostPage() {
                 Crear un cuestionario →
               </Link>
             </div>
-          ) : (
-            <label className="block">
-              <span className="text-sm font-medium text-ink">Cuestionario</span>
-              <select
-                value={selectedQuiz}
-                onChange={(event) => setSelectedQuiz(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-border bg-[var(--color-field)] px-4 py-3 font-semibold text-ink focus:border-accent focus:outline-none"
-              >
-                {quizzes.map((quiz) => (
-                  <option key={quiz.id} value={quiz.id}>
-                    {quiz.title} ({quiz.questionCount} preguntas)
-                  </option>
-                ))}
-              </select>
+          ) : <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex gap-2" aria-label="Tipo de cuestionario">
+                <button type="button" aria-pressed={quizTab === "STANDARD"} onClick={() => { setQuizTab("STANDARD"); setQuizPage(1); }}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${quizTab === "STANDARD" ? "bg-accent text-[#04211f]" : "game-chip text-ink-muted hover:text-ink"}`}>Originales ({standardQuizzes.length})</button>
+                <button type="button" aria-pressed={quizTab === "MIXED"} onClick={() => { setQuizTab("MIXED"); setQuizPage(1); }}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${quizTab === "MIXED" ? "bg-accent text-[#04211f]" : "game-chip text-ink-muted hover:text-ink"}`}>Mezclas ({mixedQuizzes.length})</button>
+              </div>
+              <span className="text-xs text-ink-muted">Elige una tarjeta para continuar</span>
+            </div>
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+              <span className="sr-only">Buscar cuestionario por título o autor</span>
+              <input value={quizQuery} onChange={(event) => { setQuizQuery(event.target.value); setQuizPage(1); }} placeholder="Buscar por título o autor…"
+                className="w-full rounded-xl border border-border bg-[var(--color-field)] py-2.5 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none" />
             </label>
-          )}
+            <div className="grid gap-2 sm:grid-cols-2" aria-label="Cuestionarios disponibles">
+              {visibleQuizzes.map((quiz) => {
+                const active = quiz.id === selectedQuiz;
+                return <button key={quiz.id} type="button" aria-pressed={active} onClick={() => setSelectedQuiz(quiz.id)}
+                  className={`min-w-0 rounded-xl border p-3 text-left transition-colors ${active ? "border-accent bg-accent/15 ring-1 ring-accent" : quiz.origin === "MIXED" ? "border-sky-500/30 bg-sky-500/5 hover:border-sky-400" : "border-border bg-surface/60 hover:border-accent/60"}`}>
+                  <span className="flex items-start justify-between gap-2"><strong className="line-clamp-2 text-sm text-ink" title={quiz.title}>{quiz.title}</strong>{active && <Check className="h-5 w-5 shrink-0 text-accent" />}</span>
+                  <span className="mt-2 block text-xs text-ink-muted">{quiz.questionCount} preguntas · {quiz.origin === "MIXED" ? "Mezcla" : "Original"}</span>
+                  <span className="mt-1 block truncate text-xs text-ink-muted">{quiz.creatorName ? `Por ${quiz.creatorName}` : "Autor no registrado"} · {new Date(quiz.createdAt).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" })}</span>
+                </button>;
+              })}
+              {filteredQuizzes.length === 0 && <p className="col-span-full rounded-xl border border-border p-4 text-sm text-ink-muted">{quizQuery.trim() ? "No se encontraron cuestionarios con esa búsqueda." : "No hay cuestionarios de este tipo."}</p>}
+            </div>
+            {pageCount > 1 && <div className="flex items-center justify-between gap-2 text-xs text-ink-muted">
+              <button type="button" disabled={currentPage <= 1} onClick={() => setQuizPage(currentPage - 1)} className="inline-flex items-center gap-1 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /> Anterior</button>
+              <span>Página {currentPage} de {pageCount}</span>
+              <button type="button" disabled={currentPage >= pageCount} onClick={() => setQuizPage(currentPage + 1)} className="inline-flex items-center gap-1 disabled:opacity-40">Siguiente <ChevronRight className="h-4 w-4" /></button>
+            </div>}
+            {selectedQuizData && <p role="status" className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-ink">Seleccionado: <strong>{selectedQuizData.title}</strong> · {selectedQuizData.questionCount} preguntas</p>}
+          </div>}
 
           {setupError && (
             <p className="rounded-xl bg-danger/15 px-4 py-3 text-sm text-danger-readable">{setupError}</p>
@@ -328,7 +375,7 @@ export function HostPage() {
 
           {status === "ACTIVE" && question && !ended && (
             <>
-              <div className="game-panel min-h-0 flex-1 rounded-3xl p-5">
+              <div className="game-panel min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-3xl p-4 sm:p-5">
                 <QuestionStage
                   question={question}
                   remaining={remaining}
@@ -385,6 +432,15 @@ export function HostPage() {
 
           {ended && (
             <div className="game-panel relative min-h-0 flex-1 overflow-y-auto rounded-3xl p-6">
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                aria-label="Volver al panel de administración"
+                title="Volver al panel"
+                className="absolute left-5 top-5 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface/80 text-ink-muted transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
               <div className="flex min-h-full w-full flex-col items-center justify-center py-6">
                 <h2 className="mb-6 text-center text-3xl font-black text-ink">🏆 Resultado final</h2>
                 <Podium podium={ended.podium} leaderboard={ended.leaderboard} />

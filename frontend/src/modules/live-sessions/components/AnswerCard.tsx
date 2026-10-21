@@ -20,6 +20,7 @@ export interface AnswerCardProps {
   /** Stagger index for entry animation. */
   index?: number;
   className?: string;
+  compact?: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ export function AnswerCard({
   disabled = false,
   index = 0,
   className = "",
+  compact = false,
 }: AnswerCardProps) {
   const palette = paletteFor(slot);
   const resolvedImage = resolveMediaUrl(imageUrl ?? null);
@@ -87,8 +89,8 @@ export function AnswerCard({
         )}
 
         <span
-          className={`flex-1 text-left font-extrabold leading-snug drop-shadow-sm break-words ${
-            isPlayer ? "text-sm sm:text-lg md:text-xl" : "text-lg sm:text-2xl xl:text-3xl"
+          className={`min-w-0 flex-1 text-left font-extrabold leading-snug drop-shadow-sm [overflow-wrap:anywhere] ${
+            isPlayer ? "text-sm sm:text-lg md:text-xl" : compact ? "text-base sm:text-xl xl:text-2xl" : "text-lg sm:text-2xl xl:text-3xl"
           }`}
         >
           {text}
@@ -103,8 +105,8 @@ export function AnswerCard({
     </>
   );
 
-  const base = `relative flex w-full items-center overflow-hidden rounded-2xl px-3.5 py-3 sm:px-5 sm:py-4 text-white transition-all duration-200 ${
-    isPlayer ? "min-h-[58px] sm:min-h-[80px]" : "py-4 sm:py-5"
+  const base = `relative flex w-full items-center overflow-hidden rounded-2xl px-3.5 py-3 sm:px-5 text-white transition-all duration-200 ${
+    isPlayer ? "min-h-[58px] sm:min-h-[80px] sm:py-4" : compact ? "sm:py-3" : "py-4 sm:py-5"
   }`;
 
   if (Tag === "button") {

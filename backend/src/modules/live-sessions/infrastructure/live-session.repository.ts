@@ -11,6 +11,7 @@ import type {
   QuestionType,
 } from "../domain/types.ts";
 import type { LiveSessionStore, NewQuestionInput } from "../application/ports.ts";
+import type { BankDetail, BankSummary, CreateQuestionBankInput, QuestionBankModule } from "../domain/bank.types.ts";
 
 const TYPE_TO_PRISMA: Record<QuestionType, "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_SELECT" | "OPEN_TEXT" | "CLOSEST_TO"> = {
   multiple_choice: "MULTIPLE_CHOICE",
@@ -32,6 +33,8 @@ export interface NewQuizInput {
   title: string;
   description: string | null;
   tenantId: string | null;
+  createdById: string | null;
+  origin: "STANDARD" | "MIXED";
   questions: NewQuestionInput[];
 }
 
@@ -124,12 +127,98 @@ function mapQuestion(row: {
  * directly.
  */
 export class LiveSessionRepository implements LiveSessionStore {
+  async listBanks(filter: { tenantId?: string | null; module?: QuestionBankModule }): Promise<BankSummary[]> {
+    const where: Prisma.QuestionBankWhereInput = {};
+    if (filter.tenantId !== undefined) {
+      where.OR = [{ tenantId: filter.tenantId }, { isShared: true }];
+    }
+    if (filter.module) where.module = filter.module;
+    const rows = await prisma.questionBank.findMany({
+      where,
+      orderBy: [{ module: "asc" }, { name: "asc" }],
+      select: {
+        id: true, tenantId: true, name: true, module: true, description: true,
+        isShared: true, createdAt: true, _count: { select: { items: true } },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      tenantId: row.tenantId,
+      name: row.name,
+      module: row.module as QuestionBankModule,
+      description: row.description,
+      isShared: row.isShared,
+      itemCount: row._count.items,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  async getBank(id: string): Promise<BankDetail | null> {
+    const row = await prisma.questionBank.findUnique({
+      where: { id },
+      include: { items: { orderBy: { orderIndex: "asc" } }, _count: { select: { items: true } } },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      name: row.name,
+      module: row.module as QuestionBankModule,
+      description: row.description,
+      isShared: row.isShared,
+      itemCount: row._count.items,
+      createdAt: row.createdAt.toISOString(),
+      items: row.items.map((item) => ({
+        id: item.id,
+        orderIndex: item.orderIndex,
+        type: TYPE_FROM_PRISMA[item.type] ?? "multiple_choice",
+        text: item.text,
+        options: jsonArray(item.options),
+        correctIndex: item.correctIndex,
+        correctIndices: Array.isArray(item.correctIndices) ? item.correctIndices as number[] : null,
+        correctText: item.correctText,
+        rangeMin: item.rangeMin,
+        rangeMax: item.rangeMax,
+        correctNumber: item.correctNumber,
+        explanation: item.explanation,
+        imageUrl: item.imageUrl,
+        optionImages: Array.isArray(item.optionImages) ? item.optionImages as (string | null)[] : null,
+        baseScore: item.baseScore,
+        timeSec: item.timeSec,
+      })),
+    };
+  }
+
+  async createBank(input: CreateQuestionBankInput): Promise<BankDetail> {
+    const row = await prisma.questionBank.create({
+      data: {
+        tenantId: input.tenantId ?? null,
+        name: input.name,
+        module: input.module,
+        description: input.description ?? null,
+        isShared: input.isShared ?? false,
+        createdById: input.createdById ?? null,
+        items: {
+          create: input.items.map((item, index) => ({
+            ...questionCreateData(item, index),
+          })),
+        },
+      },
+      select: { id: true },
+    });
+    const bank = await this.getBank(row.id);
+    if (!bank) throw new Error("Question bank could not be read after creation");
+    return bank;
+  }
+
   async createQuiz(input: NewQuizInput): Promise<{ id: string; questionCount: number }> {
     const quiz = await prisma.quiz.create({
       data: {
         title: input.title,
         description: input.description ?? null,
         tenantId: input.tenantId ?? null,
+        createdById: input.createdById,
+        origin: input.origin,
         questions: {
           create: input.questions.map((q, index) => questionCreateData(q, index)),
         },
@@ -155,6 +244,9 @@ export class LiveSessionRepository implements LiveSessionStore {
       select: {
         id: true,
         tenantId: true,
+        createdById: true,
+        createdBy: { select: { name: true } },
+        origin: true,
         title: true,
         description: true,
         createdAt: true,
@@ -164,6 +256,9 @@ export class LiveSessionRepository implements LiveSessionStore {
     return rows.map((row) => ({
       id: row.id,
       tenantId: row.tenantId,
+      createdById: row.createdById,
+      creatorName: row.createdBy?.name ?? null,
+      origin: row.origin as "STANDARD" | "MIXED",
       title: row.title,
       description: row.description,
       questionCount: row._count.questions,
@@ -190,6 +285,9 @@ export class LiveSessionRepository implements LiveSessionStore {
       select: {
         id: true,
         tenantId: true,
+        createdById: true,
+        createdBy: { select: { name: true } },
+        origin: true,
         title: true,
         description: true,
         createdAt: true,
@@ -200,6 +298,9 @@ export class LiveSessionRepository implements LiveSessionStore {
     return {
       id: quiz.id,
       tenantId: quiz.tenantId,
+      createdById: quiz.createdById,
+      creatorName: quiz.createdBy?.name ?? null,
+      origin: quiz.origin as "STANDARD" | "MIXED",
       title: quiz.title,
       description: quiz.description,
       createdAt: quiz.createdAt.toISOString(),
@@ -289,7 +390,10 @@ export class LiveSessionRepository implements LiveSessionStore {
 
   async findByPin(pin: string): Promise<SessionRow | null> {
     const row = await prisma.liveSession.findFirst({
-      where: { pin, status: { not: "FINISHED" } },
+      // Keep finished sessions discoverable for participants reconnecting to
+      // retrieve their final ranking. New joins are still rejected by the
+      // game engine unless that account already belongs to the session.
+      where: { pin },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -424,6 +528,25 @@ export class LiveSessionRepository implements LiveSessionStore {
         answeredAt: new Date(record.answeredAt),
       },
     });
+  }
+
+  async getAnswerCounts(sessionId: string): Promise<Array<{
+    playerId: string;
+    correctAnswers: number;
+    totalAnswers: number;
+  }>> {
+    const answers = await prisma.liveAnswer.findMany({
+      where: { sessionId },
+      select: { playerId: true, isCorrect: true },
+    });
+    const counts = new Map<string, { correctAnswers: number; totalAnswers: number }>();
+    for (const answer of answers) {
+      const count = counts.get(answer.playerId) ?? { correctAnswers: 0, totalAnswers: 0 };
+      count.totalAnswers += 1;
+      if (answer.isCorrect) count.correctAnswers += 1;
+      counts.set(answer.playerId, count);
+    }
+    return [...counts].map(([playerId, count]) => ({ playerId, ...count }));
   }
 
   /**

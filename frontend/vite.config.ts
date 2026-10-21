@@ -16,10 +16,30 @@ export default defineConfig(({ mode }) => {
   const base = env["VITE_BASE_PATH"] || "/sat/";
   const apiTarget = env["VITE_DEV_API_TARGET"] || "http://localhost:4000";
   const stripBase = (path: string): string => path.replace(base.replace(/\/$/, ""), "") || "/";
+  const baseWithoutSlash = base.replace(/\/+$/, "");
 
   return {
     base,
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: "redirect-base-without-trailing-slash",
+        configureServer(server) {
+          server.middlewares.use((request, response, next) => {
+            const requestUrl = request.url ?? "/";
+            const [pathname, query = ""] = requestUrl.split("?", 2);
+            if (pathname === baseWithoutSlash) {
+              response.statusCode = 302;
+              response.setHeader("Location", `${base}${query ? `?${query}` : ""}`);
+              response.end();
+              return;
+            }
+            next();
+          });
+        },
+      },
+    ],
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),

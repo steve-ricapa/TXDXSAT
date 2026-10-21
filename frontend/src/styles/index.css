@@ -388,6 +388,12 @@ body {
 }
 .slide-up { animation: txdx-slide-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+@keyframes txdx-drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.drawer-in { animation: txdx-drawer-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 @keyframes txdx-drop-in {
   0% { opacity: 0; transform: translateY(-24px) scale(0.9); }
   60% { transform: translateY(4px) scale(1.03); }
@@ -474,7 +480,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .live-blob,
-  .pop-in, .slide-up, .drop-in, .fade-in, .shake, .pulse-ring, .urgent, .stagger, .podium-rise, .flash, .skeleton::after {
+  .pop-in, .slide-up, .drawer-in, .drop-in, .fade-in, .shake, .pulse-ring, .urgent, .stagger, .podium-rise, .flash, .skeleton::after {
     animation: none !important;
   }
   .confetti-piece { display: none; }

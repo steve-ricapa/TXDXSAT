@@ -466,18 +466,26 @@ export class GameEngine {
     return session;
   }
 
-  getEndedPayload(session: EngineSession) {
+  async getEndedPayload(session: EngineSession) {
     if (session.status !== "FINISHED") return null;
     const leaderboard = this.getLeaderboard(session.id);
     const answersByPlayer = this.countAnswersByPlayer(session);
+    const persistedCounts = await this.store.getAnswerCounts(session.id);
+    const countsByPlayer = new Map(persistedCounts.map((entry) => [entry.playerId, {
+      correct: entry.correctAnswers,
+      total: entry.totalAnswers,
+    }]));
+    // The in-memory session is authoritative while it is loaded. Persisted
+    // counts fill the gap when a finished session is rehydrated after restart.
+    for (const [playerId, count] of answersByPlayer) countsByPlayer.set(playerId, count);
     const resultEntries: LiveSessionResultEntry[] = leaderboard.map((entry) => ({
       rank: entry.rank,
       playerId: entry.playerId,
       username: entry.username,
       avatar: entry.avatar,
       score: entry.score,
-      correctAnswers: answersByPlayer.get(entry.playerId)?.correct ?? 0,
-      totalAnswers: answersByPlayer.get(entry.playerId)?.total ?? 0,
+      correctAnswers: countsByPlayer.get(entry.playerId)?.correct ?? 0,
+      totalAnswers: countsByPlayer.get(entry.playerId)?.total ?? 0,
     }));
     return {
       sessionId: session.id,
@@ -535,7 +543,7 @@ export class GameEngine {
       });
     }
 
-    void this.store.saveAnswer(session.id, session.tenantId, record).catch((error: unknown) => {
+    await this.store.saveAnswer(session.id, session.tenantId, record).catch((error: unknown) => {
       this.logger.warn({ err: error, playerId: player.id }, "failed to persist answer");
     });
 

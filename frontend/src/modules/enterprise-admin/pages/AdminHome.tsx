@@ -1,9 +1,11 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Building2,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Pencil,
   Radio,
   Search,
@@ -20,6 +22,113 @@ import {
   type TenantAnalytics,
   type TenantSummary,
 } from "@/modules/tenants/lib/api";
+
+interface PickerOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+function SearchablePicker({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  disabled = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: PickerOption[];
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value);
+  const filtered = options.filter((option) =>
+    `${option.label} ${option.description ?? ""}`.toLocaleLowerCase("es").includes(query.trim().toLocaleLowerCase("es")),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative min-w-0">
+      <span id={`${id}-label`} className="mb-1 block text-xs font-semibold uppercase tracking-wider text-accent">{label}</span>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={`${id}-label`}
+        disabled={disabled || options.length === 0}
+        onClick={() => { setOpen((current) => !current); setQuery(""); }}
+        className="flex w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-background/70 px-3 py-2 text-left text-sm font-semibold text-ink transition hover:border-accent/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-full min-w-72 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl shadow-black/40">
+          <label className="relative block border-b border-border p-2">
+            <Search className="pointer-events-none absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+            <span className="sr-only">Buscar {label.toLocaleLowerCase("es")}</span>
+            <input
+              autoFocus
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`Buscar ${label.toLocaleLowerCase("es")}…`}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 pl-9 text-sm text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+            />
+          </label>
+          <div id={`${id}-listbox`} role="listbox" aria-labelledby={`${id}-label`} className="max-h-64 overflow-y-auto p-1.5">
+            {filtered.length > 0 ? filtered.map((option) => {
+              const active = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => { onChange(option.value); setOpen(false); setQuery(""); }}
+                  className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition ${active ? "bg-accent/15 text-ink" : "text-ink hover:bg-surface-raised"}`}
+                >
+                  <Check className={`mt-0.5 h-4 w-4 shrink-0 ${active ? "text-accent" : "text-transparent"}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold leading-5">{option.label}</span>
+                    {option.description && <span className="mt-0.5 block text-xs text-ink-muted">{option.description}</span>}
+                  </span>
+                </button>
+              );
+            }) : <p className="px-3 py-5 text-center text-sm text-ink-muted">No hay resultados para “{query}”.</p>}
+          </div>
+          <p className="border-t border-border px-3 py-2 text-[11px] text-ink-muted">
+            {filtered.length === options.length ? `${options.length} opciones` : `${filtered.length} de ${options.length} opciones`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function AdminHome() {
   const { user } = useAuth();
@@ -179,10 +288,10 @@ export function AdminHome() {
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Índice de Precisión Global"
-              value={`${analytics.summary.overallAccuracy}%`}
-              hint={analytics.summary.overallAccuracy >= 75 ? "Nivel de resiliencia alto" : "Requiere refuerzo en temas clave"}
+              value={analytics.summary.evaluatedEmployees > 0 ? `${analytics.summary.overallAccuracy}%` : "—"}
+              hint={analytics.summary.evaluatedEmployees === 0 ? "Sin respuestas registradas" : analytics.summary.overallAccuracy >= 75 ? "Nivel de resiliencia alto" : "Requiere refuerzo en temas clave"}
               icon={<ShieldCheck className="h-4 w-4" />}
-              tone={analytics.summary.overallAccuracy >= 75 ? "success" : "warning"}
+              tone={analytics.summary.evaluatedEmployees === 0 ? "info" : analytics.summary.overallAccuracy >= 75 ? "success" : "warning"}
             />
             <StatCard
               label="Colaboradores Evaluados"
@@ -200,9 +309,9 @@ export function AdminHome() {
             <StatCard
               label="Colaboradores en Riesgo"
               value={String(analytics.summary.atRiskCount)}
-              hint={analytics.summary.atRiskCount > 0 ? "Tasa de error superior al 40%" : "Sin colaboradores críticos"}
+              hint={analytics.summary.evaluatedEmployees === 0 ? "Pendiente de evaluación" : analytics.summary.atRiskCount > 0 ? "Tasa de error superior al 40%" : "Sin colaboradores críticos"}
               icon={<ShieldAlert className="h-4 w-4" />}
-              tone={analytics.summary.atRiskCount > 0 ? "warning" : "success"}
+              tone={analytics.summary.evaluatedEmployees === 0 ? "info" : analytics.summary.atRiskCount > 0 ? "warning" : "success"}
             />
           </section>
 
@@ -236,7 +345,7 @@ export function AdminHome() {
                     className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
                   >
                     <Pencil className="h-4 w-4" />
-                    Editor de Quizzes
+                    Editor de cuestionarios
                   </Link>
                 </>
               )}
@@ -320,7 +429,7 @@ export function AdminHome() {
                     <thead className="border-b border-border bg-surface-raised/60 text-xs font-semibold uppercase tracking-wider text-ink-muted">
                       <tr>
                         <th className="px-5 py-3.5">Colaborador</th>
-                        <th className="px-4 py-3.5 text-center">Evaluaciones</th>
+                        <th className="px-4 py-3.5 text-center">Sesiones</th>
                         <th className="px-4 py-3.5 text-center">Aciertos / Total</th>
                         <th className="px-5 py-3.5">Precisión</th>
                         <th className="px-4 py-3.5 text-center">Puntaje</th>
@@ -375,7 +484,7 @@ export function AdminHome() {
 
                             {/* Accuracy progress bar */}
                             <td className="px-5 py-4 min-w-44">
-                              <div className="space-y-1">
+                              {emp.totalAnswers === 0 ? <span className="text-xs text-ink-soft">Sin datos</span> : <div className="space-y-1">
                                 <div className="flex justify-between text-xs font-semibold">
                                   <span
                                     className={
@@ -404,7 +513,7 @@ export function AdminHome() {
                                     style={{ width: `${emp.accuracyRate}%` }}
                                   />
                                 </div>
-                              </div>
+                              </div>}
                             </td>
 
                             {/* Score */}
@@ -414,7 +523,7 @@ export function AdminHome() {
 
                             {/* Risk / Status Badge */}
                             <td className="px-5 py-4 text-center">
-                              {emp.sessionsCount === 0 ? (
+                              {emp.totalAnswers === 0 ? (
                                 <span className="inline-flex items-center rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-medium text-gray-400">
                                   Sin evaluar
                                 </span>
@@ -454,50 +563,38 @@ export function AdminHome() {
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
                     <ShieldCheck className="h-5 w-5" />
                   </span>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-accent">Cuestionario en análisis</p>
-                    <label htmlFor="quiz-select" className="sr-only">Seleccionar cuestionario</label>
-                    <select
-                      id="quiz-select"
+                  <div className="grid min-w-0 flex-1 gap-4 lg:grid-cols-[minmax(16rem,1.4fr)_minmax(14rem,1fr)]">
+                    <SearchablePicker
+                      id="quiz-picker"
+                      label={`Cuestionario en análisis · ${analytics.quizzes.length}`}
                       value={selectedQuizId}
-                      onChange={(e) => {
-                        const quizId = e.target.value;
+                      options={analytics.quizzes.map((quiz) => ({
+                        value: quiz.id,
+                        label: quiz.title,
+                        description: `${quiz.questionCount} preguntas · ${quiz.sessionCount} sesiones`,
+                      }))}
+                      placeholder="Selecciona un cuestionario"
+                      onChange={(quizId) => {
                         const quiz = analytics.quizzes.find((item) => item.id === quizId);
                         setSelectedQuizId(quizId);
                         setSelectedSessionId(quiz?.sessions[0]?.id ?? "");
                       }}
-                      className="mt-0.5 bg-transparent text-base font-bold text-ink focus:outline-none cursor-pointer"
-                    >
-                      {analytics.quizzes.map((q) => (
-                        <option key={q.id} value={q.id} className="bg-surface text-ink">
-                          {q.title} ({q.questionCount} preguntas)
-                        </option>
-                      ))}
-                    </select>
+                    />
+                    <SearchablePicker
+                      id="session-picker"
+                      label={`Sesión específica · ${currentQuiz?.sessions.length ?? 0}`}
+                      value={currentSession?.id ?? ""}
+                      options={(currentQuiz?.sessions ?? []).map((session, index) => ({
+                        value: session.id,
+                        label: `Sesión ${index + 1}`,
+                        description: `${session.finishedAt ? new Date(session.finishedAt).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" }) : "Fecha no disponible"} · ${session.participantCount} participantes · ${session.accuracyRate}% precisión`,
+                      }))}
+                      placeholder="Sin sesiones finalizadas"
+                      disabled={!currentQuiz || currentQuiz.sessions.length === 0}
+                      onChange={setSelectedSessionId}
+                    />
                   </div>
                 </div>
-
-                {currentQuiz && (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-accent">Sesión específica</p>
-                    <label htmlFor="session-select" className="sr-only">Seleccionar sesión</label>
-                    <select
-                      id="session-select"
-                      value={currentSession?.id ?? ""}
-                      onChange={(e) => setSelectedSessionId(e.target.value)}
-                      disabled={currentQuiz.sessions.length === 0}
-                      className="mt-1 max-w-xs bg-transparent text-sm font-semibold text-ink focus:outline-none cursor-pointer disabled:text-ink-muted"
-                    >
-                      {currentQuiz.sessions.length === 0 ? (
-                        <option value="">Sin sesiones finalizadas</option>
-                      ) : currentQuiz.sessions.map((session, index) => (
-                        <option key={session.id} value={session.id} className="bg-surface text-ink">
-                          Sesión {index + 1} · {session.finishedAt ? new Date(session.finishedAt).toLocaleString("es") : "fecha no disponible"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
 
                 {currentQuiz && (
                   <div className="flex items-center gap-4 text-xs">

@@ -14,6 +14,7 @@
 export type SoundName =
   | "tick"
   | "blip"
+  | "questionCue"
   | "correct"
   | "wrong"
   | "drumroll"
@@ -121,6 +122,9 @@ class SoundManager {
       case "blip":
         this.sweep(660, 880, 0.09, "triangle");
         break;
+      case "questionCue":
+        this.questionCue();
+        break;
       case "submit":
         this.sweep(520, 1040, 0.14, "sine");
         break;
@@ -171,7 +175,7 @@ class SoundManager {
 
   // --- Background music ----------------------------------------------------
 
-  /** Start (and loop) procedural background music. Safe before first gesture. */
+  /** Play a single procedural background phrase. Safe before first gesture. */
   startMusic(kind: MusicKind): void {
     if (this.muted) return;
     const ctx = this.ensureCtx();
@@ -188,15 +192,21 @@ class SoundManager {
     const buffer = this.buildMusic(kind);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.loop = true;
+    src.loop = false;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(kind === "lobby" ? 0.6 : 0.5, ctx.currentTime + 1.2);
+    gain.gain.linearRampToValueAtTime(kind === "lobby" ? 0.2 : 0.24, ctx.currentTime + 1.2);
     src.connect(gain).connect(this.master);
     src.start();
 
     this.musicSrc = src;
     this.musicKind = kind;
+    src.onended = () => {
+      if (this.musicSrc === src) {
+        this.musicSrc = null;
+        this.musicKind = null;
+      }
+    };
   }
 
   stopMusic(): void {
@@ -216,6 +226,15 @@ class SoundManager {
     return this.musicKind;
   }
 
+  /** Stop audio from an old module instance when Vite hot-reloads this file. */
+  dispose(): void {
+    this.stop();
+    this.stopMusic();
+    if (this.ctx) void this.ctx.close();
+    this.ctx = null;
+    this.master = null;
+  }
+
   /**
    * Render a looping bed of notes into an AudioBuffer. Cheaper and more flexible
    * than bundling audio files, and it respects the "no Kahoot audio" rule.
@@ -223,18 +242,19 @@ class SoundManager {
   private buildMusic(kind: MusicKind): AudioBuffer {
     const ctx = this.ctx as AudioContext;
     const sampleRate = ctx.sampleRate;
-    const seconds = kind === "lobby" ? 6 : 4;
+    const seconds = 12;
     const length = Math.floor(sampleRate * seconds);
     const buffer = ctx.createBuffer(1, length, sampleRate);
     const data = buffer.getChannelData(0);
 
-    // Note tables (Hz). Lobby = warm major arpeggio; question = tense minor pulse.
+    // Slow, quiet beds: one melody pass per 12-second loop instead of the
+    // repeated half-second lobby notes that sounded like a spinning roulette.
     const melody =
       kind === "lobby"
         ? [261.63, 329.63, 392.0, 523.25, 392.0, 329.63]
-        : [220.0, 261.63, 293.66, 261.63];
-    const bass = kind === "lobby" ? [130.81, 196.0] : [110.0, 110.0];
-    const noteDur = seconds / (melody.length * (kind === "lobby" ? 2 : 2));
+        : [220.0, 261.63, 293.66, 261.63, 196.0, 246.94, 261.63, 220.0];
+    const bass = kind === "lobby" ? [130.81, 196.0] : [110.0, 98.0, 123.47, 110.0];
+    const noteDur = seconds / melody.length;
     const bassDur = seconds / bass.length;
 
     for (let i = 0; i < length; i += 1) {
@@ -278,6 +298,30 @@ class SoundManager {
   private blip(freq: number, dur: number, osc: OscillatorType, gain = 1): void {
     if (!this.ctx) return;
     this.tone(freq, dur, osc, this.ctx.currentTime, gain);
+  }
+
+  /** A gentle, one-shot two-note cue when a new question appears. */
+  private questionCue(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const start = ctx.currentTime;
+    for (const [frequency, offset, level] of [
+      [392, 0, 0.13],
+      [523.25, 0.2, 0.1],
+    ] as const) {
+      const at = start + offset;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
+      oscillator.connect(gain).connect(master);
+      oscillator.start(at);
+      oscillator.stop(at + 0.58);
+    }
   }
 
   private sweep(from: number, to: number, dur: number, osc: OscillatorType): void {
@@ -426,3 +470,7 @@ class SoundManager {
 }
 
 export const sound = new SoundManager();
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => sound.dispose());
+}

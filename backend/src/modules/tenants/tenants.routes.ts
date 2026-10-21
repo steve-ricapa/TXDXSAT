@@ -219,18 +219,20 @@ export function createTenantsRouter(): Router {
       const incorrectAnswers = totalAnswers - correctAnswers;
       const accuracyRate = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
 
-      let riskLevel: "Bajo" | "Medio" | "Alto" = "Bajo";
-      let status: "Sobresaliente" | "Aprobado" | "Requiere Refuerzo" = "Aprobado";
+      let riskLevel: "Bajo" | "Medio" | "Alto" | "Sin datos" = "Sin datos";
+      let status: "Sobresaliente" | "Aprobado" | "Requiere Refuerzo" | "Sin evaluar" = "Sin evaluar";
 
-      if (accuracyRate >= 80) {
-        riskLevel = "Bajo";
-        status = "Sobresaliente";
-      } else if (accuracyRate >= 60) {
-        riskLevel = "Medio";
-        status = "Aprobado";
-      } else {
-        riskLevel = "Alto";
-        status = "Requiere Refuerzo";
+      if (totalAnswers > 0) {
+        if (accuracyRate >= 80) {
+          riskLevel = "Bajo";
+          status = "Sobresaliente";
+        } else if (accuracyRate >= 60) {
+          riskLevel = "Medio";
+          status = "Aprobado";
+        } else {
+          riskLevel = "Alto";
+          status = "Requiere Refuerzo";
+        }
       }
 
       return {
@@ -251,8 +253,8 @@ export function createTenantsRouter(): Router {
 
     // Sort employees: highest score first
     const employeesSortedByScore = [...employeeMetrics].sort((a, b) => b.totalScore - a.totalScore);
-    const atRiskEmployees = employeeMetrics.filter((e) => e.accuracyRate < 60 || e.riskLevel === "Alto");
-    const topEmployees = employeeMetrics.filter((e) => e.accuracyRate >= 80);
+    const atRiskEmployees = employeeMetrics.filter((e) => e.totalAnswers > 0 && e.accuracyRate < 60);
+    const topEmployees = employeeMetrics.filter((e) => e.totalAnswers > 0 && e.accuracyRate >= 80);
 
     // Compute Quizzes Performance
     const quizAnalytics = tenantQuizzes.map((quiz) => {
@@ -370,7 +372,7 @@ export function createTenantsRouter(): Router {
       },
       summary: {
         totalEmployees: employees.length,
-        evaluatedEmployees: employeeMetrics.filter((e) => e.sessionsCount > 0).length,
+        evaluatedEmployees: employeeMetrics.filter((e) => e.totalAnswers > 0).length,
         overallAccuracy,
         totalSessions: sessions.length,
         totalQuizzes: tenantQuizzes.length,

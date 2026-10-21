@@ -20,6 +20,7 @@ import type {
 } from "../lib/protocol";
 import { sound } from "../lib/sound";
 import { hostStore } from "../lib/storage";
+import { mergePlayerSnapshots, upsertPlayerSnapshot } from "../lib/merge-player-snapshots";
 
 /**
  * Presenter / projector screen (`/live/present/:sessionId`).
@@ -41,6 +42,7 @@ export function PresentPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const joinedRef = useRef(false);
+  const lastQuestionCueRef = useRef<string | null>(null);
   const remaining = useCountdown(question && !results ? question.endsAt : null);
 
   useEffect(() => {
@@ -61,7 +63,11 @@ export function PresentPage() {
   }, [viewToken, sessionId]);
 
   useSocketEvent<SessionStatePayload>(ServerEvents.sessionState, (payload) => {
-    if (payload.sessionId === sessionId) setState(payload);
+    if (payload.sessionId === sessionId) {
+      setState((current) => current
+        ? { ...payload, players: mergePlayerSnapshots(current.players, payload.players) }
+        : payload);
+    }
   });
 
   useSocketEvent<{ countdownSeconds: number }>(ServerEvents.gameStarted, () => {
@@ -74,8 +80,7 @@ export function PresentPage() {
   useSocketEvent<PlayerJoinedPayload>(ServerEvents.playerJoined, (player) => {
     setState((current) => {
       if (!current) return current;
-      const players = current.players.filter((item) => item.playerId !== player.playerId);
-      players.push(player);
+      const players = upsertPlayerSnapshot(current.players, player);
       return { ...current, players };
     });
   });
@@ -89,7 +94,6 @@ export function PresentPage() {
 
   useSocketEvent<{ seconds: number }>(ServerEvents.gameCountdown, (payload) => {
     setCountdown(payload.seconds);
-    sound.play("heartbeat");
   });
 
   useSocketEvent<PublicQuestion>(ServerEvents.gameQuestion, (payload) => {
@@ -98,7 +102,10 @@ export function PresentPage() {
     setAnsweredCount(0);
     setCountdown(null);
     setState((current) => current ? { ...current, status: "ACTIVE", questionIndex: payload.index } : current);
-    sound.play("submit");
+    if (lastQuestionCueRef.current !== payload.questionId) {
+      lastQuestionCueRef.current = payload.questionId;
+      sound.play("questionCue");
+    }
   });
 
   useSocketEvent<AnswerCountPayload>(ServerEvents.gameAnswerCount, (payload) => {
@@ -129,17 +136,11 @@ export function PresentPage() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  // Background music follows the game phase.
+  // Avoid a repeating soundtrack while participants read and answer.
   useEffect(() => {
-    if (ended) {
-      sound.stopMusic();
-      return;
-    }
-    if (state?.status === "WAITING") sound.startMusic("lobby");
-    else if (state?.status === "ACTIVE" && question) sound.startMusic("question");
-  }, [state?.status, question, ended]);
-
-  useEffect(() => () => sound.stopMusic(), []);
+    sound.stopMusic();
+    return () => sound.stopMusic();
+  }, []);
 
   if (!viewToken) {
     return (
@@ -201,7 +202,7 @@ export function PresentPage() {
         )}
 
         {state?.status === "ACTIVE" && question && !ended && (
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <QuestionStage
               question={question}
               remaining={remaining}

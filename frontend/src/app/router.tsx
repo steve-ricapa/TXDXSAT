@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { HomePage } from "./HomePage";
 import { EmployeeHome } from "@/modules/employee/pages/EmployeeHome";
@@ -29,6 +29,12 @@ export function resolveBasename(baseUrl: string): string {
 function DashboardEntry() {
   const { user } = useAuth();
   return <Navigate to={user?.role === "SUPERADMIN" ? "/superadmin" : user?.role === "EMPLOYEE" ? "/employee" : "/admin"} replace />;
+}
+
+function HostSessionRoute() {
+  const { sessionId } = useParams();
+  // A new session must mount with its own saved host token and socket state.
+  return <HostPage key={sessionId} />;
 }
 
 export const router = createBrowserRouter(
@@ -99,7 +105,7 @@ export const router = createBrowserRouter(
       path: "live/host/:sessionId",
       element: (
         <ProtectedRoute roles={["ADMIN", "SUPERADMIN"]}>
-          <HostPage />
+          <HostSessionRoute />
         </ProtectedRoute>
       ),
     },

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { getSocket } from "@/services/socket";
 import { useAuth } from "@/modules/auth/context/AuthContext";
 import { getToken } from "@/modules/auth/lib/auth-store";
@@ -51,36 +52,51 @@ export function PlayPage() {
   const [ended, setEnded] = useState<GameEndedPayload | null>(null);
   const [state, setState] = useState<SessionStatePayload | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [returnSeconds, setReturnSeconds] = useState<number | null>(null);
   const joinedRef = useRef(false);
+  const recordRef = useRef<StoredPlayer | null>(record);
+  recordRef.current = record;
+  const endedRef = useRef(false);
   const answerPendingRef = useRef(false);
+  const lastQuestionCueRef = useRef<string | null>(null);
   const remaining = useCountdown(question?.endsAt ?? null);
 
   // (Re)join on mount using the persisted playerId.
   useEffect(() => {
-    if (!record || record.userId !== user?.id || joinedRef.current) return;
+    const initialRecord = recordRef.current;
+    if (!initialRecord || initialRecord.userId !== user?.id || joinedRef.current) return;
     joinedRef.current = true;
 
     const onJoined = (payload: PlayerJoinedAckPayload) => {
-      playerStore.save({
+      const currentRecord = recordRef.current ?? initialRecord;
+      const nextRecord: StoredPlayer = {
+        ...currentRecord,
         playerId: payload.playerId,
-        userId: record.userId,
         sessionId: payload.sessionId,
-        pin: record.pin,
         username: payload.username,
         avatar: payload.avatar,
+      };
+      recordRef.current = nextRecord;
+      playerStore.save(nextRecord);
+      setRecord((current) => {
+        if (!current) return nextRecord;
+        if (
+          current.playerId === nextRecord.playerId &&
+          current.sessionId === nextRecord.sessionId &&
+          current.username === nextRecord.username &&
+          current.avatar === nextRecord.avatar
+        ) return current;
+        return nextRecord;
       });
-      setRecord((current) =>
-        current
-          ? { ...current, playerId: payload.playerId, username: payload.username, avatar: payload.avatar }
-          : current,
-      );
       setPhase((current) => (current === "connecting" ? "lobby" : current));
     };
     const onError = (payload: { message?: string }) => {
+      if (endedRef.current) return;
       if (payload?.message === "This session has already finished") return;
       setError(liveErrorMessage(payload?.message));
     };
     const onPlayerError = (payload: { event?: string; message?: string }) => {
+      if (endedRef.current) return;
       if (payload?.message === "This session has already finished") return;
       if (payload.event === ClientEvents.playerAnswer) {
         answerPendingRef.current = false;
@@ -101,13 +117,18 @@ export function PlayPage() {
     socket.on(ServerEvents.playerJoinedAck, onJoined);
     socket.on(ServerEvents.error, onError);
     socket.on(ServerEvents.playerError, onPlayerError);
-    const rejoin = () => socket.emit(ClientEvents.playerJoin, {
-      pin: record.pin,
-      username: record.username,
-      avatar: record.avatar,
-      playerId: record.playerId,
-      token: getToken(),
-    });
+    const rejoin = () => {
+      const currentRecord = recordRef.current;
+      if (!currentRecord || currentRecord.userId !== user?.id || endedRef.current) return;
+      socket.emit(ClientEvents.playerJoin, {
+        pin: currentRecord.pin,
+        sessionId: currentRecord.sessionId,
+        username: currentRecord.username,
+        avatar: currentRecord.avatar,
+        playerId: currentRecord.playerId,
+        token: getToken(),
+      });
+    };
     if (socket.connected) rejoin();
     socket.on("connect", rejoin);
 
@@ -118,7 +139,7 @@ export function PlayPage() {
       socket.off(ServerEvents.playerError, onPlayerError);
       socket.off("connect", rejoin);
     };
-  }, [record, socket, user?.id]);
+  }, [Boolean(record), sessionId, socket, user?.id]);
 
   useSocketEvent<SessionStatePayload>(ServerEvents.sessionState, (payload) => {
     setState(payload);
@@ -128,7 +149,6 @@ export function PlayPage() {
   useSocketEvent<{ seconds: number }>(ServerEvents.gameCountdown, (payload) => {
     setPhase("lobby");
     setCountdown(payload.seconds);
-    sound.play("heartbeat");
   });
 
   useSocketEvent<PublicQuestion>(ServerEvents.gameQuestion, (payload) => {
@@ -142,7 +162,10 @@ export function PlayPage() {
     setSubmitted(null);
     setCountdown(null);
     setPhase("question");
-    sound.play("blip");
+    if (lastQuestionCueRef.current !== payload.questionId) {
+      lastQuestionCueRef.current = payload.questionId;
+      sound.play("questionCue");
+    }
   });
 
   useSocketEvent<AnswerAckPayload>(ServerEvents.answerAck, (payload) => {
@@ -165,12 +188,24 @@ export function PlayPage() {
   useSocketEvent<LeaderboardEntry[]>(ServerEvents.gameLeaderboard, (payload) => setLeaderboard(payload));
 
   useSocketEvent<GameEndedPayload>(ServerEvents.gameEnded, (payload) => {
+    endedRef.current = true;
     setError(null);
     setEnded(payload);
     setLeaderboard(payload.leaderboard as any);
     setPhase("ended");
+    setReturnSeconds(10);
     sound.stopMusic();
   });
+
+  useEffect(() => {
+    if (returnSeconds === null) return;
+    if (returnSeconds <= 0) {
+      navigate("/employee", { replace: true });
+      return;
+    }
+    const timer = setTimeout(() => setReturnSeconds((seconds) => seconds === null ? null : seconds - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [navigate, returnSeconds]);
 
   // Local tick for the pre-question countdown.
   useEffect(() => {
@@ -183,9 +218,11 @@ export function PlayPage() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  // The short question timer needs no repeating music; keep only one-shot cues.
   useEffect(() => {
-    if (countdown !== null && countdown > 0) sound.startMusic("lobby");
-  }, [countdown]);
+    sound.stopMusic();
+    return () => sound.stopMusic();
+  }, []);
 
   const submit = useCallback(
     (answer: AnswerSubmission) => {
@@ -214,6 +251,17 @@ export function PlayPage() {
 
       <header className="relative z-10 flex shrink-0 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
+          {phase === "ended" && (
+            <button
+              type="button"
+              onClick={() => navigate("/employee")}
+              aria-label="Volver al inicio de Mi capacitación"
+              title="Volver a Mi capacitación"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface/80 text-ink-muted transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
           <Avatar avatar={record.avatar} />
           <div className="min-w-0">
             <p className="truncate font-bold text-ink">{record.username}</p>
@@ -388,11 +436,16 @@ export function PlayPage() {
               {/* Botón de volver */}
               <button
                 type="button"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/employee")}
                 className="w-full rounded-xl bg-accent px-6 py-3.5 font-bold text-[#04211f] shadow-lg shadow-accent/20 transition hover:scale-[1.02] hover:brightness-110 active:scale-95"
               >
-                Volver al panel
+                Volver a Mi capacitación
               </button>
+              {returnSeconds !== null && (
+                <p role="status" aria-live="polite" className="text-sm text-ink-muted">
+                  Volverás a Mi capacitación en {returnSeconds} {returnSeconds === 1 ? "segundo" : "segundos"}.
+                </p>
+              )}
             </div>
           </div>
         )}

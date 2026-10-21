@@ -46,7 +46,7 @@ export function registerLiveSessionSocketHandlers(
         const open = engine.getOpenQuestion(session);
         if (open) socket.emit(ServerEvents.gameQuestion, open);
         if (session.status === "FINISHED") {
-          const ended = engine.getEndedPayload(session);
+          const ended = await engine.getEndedPayload(session);
           if (ended) socket.emit(ServerEvents.gameEnded, ended);
         }
       } catch (error: unknown) {
@@ -69,7 +69,7 @@ export function registerLiveSessionSocketHandlers(
         const open = engine.getOpenQuestion(session);
         if (open) socket.emit(ServerEvents.gameQuestion, open);
         if (session.status === "FINISHED") {
-          const ended = engine.getEndedPayload(session);
+          const ended = await engine.getEndedPayload(session);
           if (ended) socket.emit(ServerEvents.gameEnded, ended);
         }
       } catch (error: unknown) {
@@ -87,8 +87,11 @@ export function registerLiveSessionSocketHandlers(
         const avatar = payload?.avatar;
         const playerId = payload?.playerId;
 
-        const session = await engine.findByPin(pin);
-        if (!session) throw new NotFoundError("No live session with that PIN");
+        const requestedSessionId = typeof payload?.sessionId === "string" ? payload.sessionId : null;
+        const session = requestedSessionId
+          ? await engine.findById(requestedSessionId)
+          : await engine.findByPin(pin);
+        if (!session || session.pin !== pin) throw new NotFoundError("No live session with that PIN");
         if (data.sessionId && data.sessionId !== session.id) {
           if (data.userId && data.userId !== user.id) {
             throw new ForbiddenError("Reconnect after switching accounts");
@@ -143,7 +146,7 @@ export function registerLiveSessionSocketHandlers(
         const open = engine.getOpenQuestion(session);
         if (open) socket.emit(ServerEvents.gameQuestion, open);
         if (session.status === "FINISHED") {
-          const ended = engine.getEndedPayload(session);
+          const ended = await engine.getEndedPayload(session);
           if (ended) socket.emit(ServerEvents.gameEnded, ended);
         }
       } catch (error: unknown) {

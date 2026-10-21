@@ -3,13 +3,16 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Radio } from "lucide-react";
 import { LoadingState } from "@/components/ui";
 import { SessionResultCard } from "../components/SessionResultCard";
+import { SessionResultDrawer } from "../components/SessionResultDrawer";
 import { sortEmployeeResults, useEmployeeResults } from "../useEmployeeResults";
+import type { MyLiveResult } from "@/modules/live-sessions/lib/api";
 
 const PAGE_SIZE = 6;
 
 export function EmployeeHistory() {
   const { results, loading, error } = useEmployeeResults();
   const [page, setPage] = useState(1);
+  const [selectedResult, setSelectedResult] = useState<MyLiveResult | null>(null);
   const activity = sortEmployeeResults(results);
   const pageCount = Math.max(1, Math.ceil(activity.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -35,7 +38,7 @@ export function EmployeeHistory() {
           <div className="rounded-xl border border-border bg-surface/50 px-4 py-3 text-sm text-ink-muted">
             {activity.length} {activity.length === 1 ? "sesión registrada" : "sesiones registradas"} · {activity.filter((result) => result.status === "FINISHED").length} completadas
           </div>
-          <div className="space-y-3">{visible.map((result) => <SessionResultCard key={result.sessionId} result={result} />)}</div>
+          <div className="space-y-3">{visible.map((result) => <SessionResultCard key={result.sessionId} result={result} onViewDetail={() => setSelectedResult(result)} />)}</div>
           {activity.length > PAGE_SIZE && (
             <nav className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4" aria-label="Paginación del historial">
               <p className="text-xs text-ink-muted">Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, activity.length)} de {activity.length} sesiones</p>
@@ -48,6 +51,7 @@ export function EmployeeHistory() {
           )}
         </>
       )}
+      <SessionResultDrawer key={selectedResult?.sessionId ?? "closed"} result={selectedResult} onClose={() => setSelectedResult(null)} />
     </div>
   );
 }

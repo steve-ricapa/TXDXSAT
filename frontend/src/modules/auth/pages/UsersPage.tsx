@@ -54,6 +54,7 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
   const [tenantId, setTenantId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<{ email: string; role: UserRole; tenantName: string | null } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AuthUser | null>(null);
   const [editing, setEditing] = useState<AuthUser | null>(null);
   const [editName, setEditName] = useState("");
@@ -112,8 +113,11 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
     event.preventDefault();
     setCreating(true);
     setCreateError(null);
+    setCreateSuccess(null);
     try {
-      await authApi.createUser({ name: name.trim(), email: email.trim(), password, role, tenantId: tenantId.trim() || null });
+      const account = { email: email.trim(), role, tenantName: tenants.find((tenant) => tenant.id === tenantId)?.name ?? null };
+      await authApi.createUser({ name: name.trim(), email: account.email, password, role, tenantId: tenantId.trim() || null });
+      setCreateSuccess(account);
       setName("");
       setEmail("");
       setPassword("");
@@ -121,7 +125,16 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
       setTenantId("");
       await load();
     } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : "No se pudo crear el usuario");
+      if (err instanceof ApiError) {
+        const message = err.message;
+        setCreateError(/already exists/i.test(message) ? "Ya existe una cuenta con ese correo." :
+          /invalid email/i.test(message) ? "El correo no tiene un formato válido." :
+          /at least 10 characters/i.test(message) ? "La contraseña debe tener al menos 10 caracteres." :
+          /require a tenant|tenant id/i.test(message) ? "Selecciona una organización para esta cuenta." :
+          message);
+      } else {
+        setCreateError("No se pudo registrar el usuario. Revisa los datos e inténtalo de nuevo.");
+      }
     } finally {
       setCreating(false);
     }
@@ -216,6 +229,18 @@ export function UsersPage({ tenants }: { tenants: TenantSummary[] }) {
                 {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
               </Select>
             </Field>
+
+            {createSuccess && (
+              <div className="sm:col-span-2">
+                <Alert tone="success" className="border-success/50 bg-success/15 p-4 shadow-sm">
+                  <div>
+                    <strong className="block text-base">Usuario registrado correctamente</strong>
+                    <span className="mt-1 block text-sm">{createSuccess.email} · {ROLE_LABEL[createSuccess.role]}{createSuccess.tenantName ? ` · ${createSuccess.tenantName}` : ""}</span>
+                    <span className="mt-1 block text-xs opacity-80">La cuenta ya aparece en la lista de usuarios.</span>
+                  </div>
+                </Alert>
+              </div>
+            )}
 
             {createError && (
               <div className="sm:col-span-2">

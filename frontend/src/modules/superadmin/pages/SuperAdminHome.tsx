@@ -114,7 +114,7 @@ function LaunchModal({ tenant, onClose }: LaunchModalProps) {
                     className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
                   >
                     <Pencil className="h-4 w-4" />
-                    Ir al editor de quizzes
+                    Ir al editor de cuestionarios
                   </Link>
                 </div>
               ) : (
@@ -348,7 +348,7 @@ export function SuperAdminHome() {
             className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-bold text-[#04211f] transition-colors hover:bg-[var(--color-accent-hover)]"
           >
             <Pencil className="h-3.5 w-3.5" />
-            Editor de quizzes
+            Editor de cuestionarios
           </Link>
         </div>
       </header>
